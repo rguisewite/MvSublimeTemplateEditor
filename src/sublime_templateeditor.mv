@@ -1,6 +1,3 @@
-<MIVA STANDARDOUTPUTLEVEL = "" IDENT = "$Id: endicialabels.mv 49906 2015-03-16 18:41:04Z rguisewite $">
-<MvINCLUDE FILE = "build_ident.mv">
-
 <MvCOMMENT>
 |
 | Miva Merchant
@@ -15,8 +12,8 @@
 | Copyright 1998-2015 Miva, Inc.  All rights reserved.
 | http://www.miva.com
 |
-| Prefix		 : MER-SHP-END-
-| Next Error Code: 114  
+| Prefix		 : MER-STE-
+| Next Error Code: 5  
 |
 </MvCOMMENT>
 
@@ -71,7 +68,7 @@
 	<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].SQL_Query_Count( l.search_query, l.total_count ) }">
 		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
 	<MvELSEIF EXPR = "{ NOT [ g.Module_Library_Native_DBAPI ].DB_OPENVIEW_Range( 'Merchant', 'Pages', l.search_sql, l.search_fields, g.Offset, g.Count ) }">
-		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( '#Error#', g.MvOPENVIEW_Error ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( 'MER-STE-00001', g.MvOPENVIEW_Error ) }">
 	</MvIF>
 
 	<MvASSIGN NAME = "l.page_count" VALUE = 0>
@@ -121,7 +118,7 @@
 	<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].SQL_Query_Count( l.search_query, l.total_count ) }">
 		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
 	<MvELSEIF EXPR = "{ NOT [ g.Module_Library_Native_DBAPI ].DB_OPENVIEW_Range( 'Merchant', 'ManagedTemplates', l.search_sql, l.search_fields, g.Offset, g.Count ) }">
-		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( '#Error#', l.search_sql $ g.MvOPENVIEW_Error ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( 'MER-STE-00002', l.search_sql $ g.MvOPENVIEW_Error ) }">
 	</MvIF>
 
 	<MvASSIGN NAME = "l.page_count" VALUE = 0>
@@ -174,7 +171,7 @@
 	<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].SQL_Query_Count( l.search_query, l.total_count ) }">
 		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
 	<MvELSEIF EXPR = "{ NOT [ g.Module_Library_Native_DBAPI ].DB_OPENVIEW_Range( 'Merchant', 'ManagedTemplates', l.search_sql, l.search_fields, g.Offset, g.Count ) }">
-		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( '#Error#', l.search_sql $ g.MvOPENVIEW_Error ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( 'MER-STE-00003', l.search_sql $ g.MvOPENVIEW_Error ) }">
 	</MvIF>
 
 	<MvASSIGN NAME = "l.page_count" VALUE = 0>
@@ -243,7 +240,7 @@
 	
 	<MvIF EXPR = "{ NOT [ g.Module_Feature_TUI_MGR ].TemplateManager_Create_ManagedTemplateVersion( l.managedtemplate, l.notes, g.Source, l.managedtemplateversion:settings, l.compile_error ) }">
 		<MvIF EXPR = "{ len( l.compile_error ) }">
-			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( '#Error#', l.compile_error ) }">
+			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( 'MER-STE-00004', l.compile_error ) }">
 		</MvIF>
 
 		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
