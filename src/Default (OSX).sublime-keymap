@@ -1,0 +1,6 @@
+[
+	{ "keys": [ "ctrl+m", "ctrl+t", "ctrl+p" ], "command": "mv_sublime_template_editor_get_pages" },
+	{ "keys": [ "ctrl+m", "ctrl+t", "ctrl+a" ], "command": "mv_sublime_template_editor_get_templates" },
+	{ "keys": [ "ctrl+m", "ctrl+t", "ctrl+m" ], "command": "mv_sublime_template_editor_template_menu" },
+	{ "keys": [ "ctrl+m", "ctrl+s" ], "command": "mv_sublime_template_editor_get_sites" }
+]

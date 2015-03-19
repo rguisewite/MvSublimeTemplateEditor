@@ -1,0 +1,254 @@
+<MIVA STANDARDOUTPUTLEVEL = "" IDENT = "$Id: endicialabels.mv 49906 2015-03-16 18:41:04Z rguisewite $">
+<MvINCLUDE FILE = "build_ident.mv">
+
+<MvCOMMENT>
+|
+| Miva Merchant
+|
+| This file and the source codes contained herein are the property of
+| Miva, Inc.  Use of this file is restricted to the specific terms and
+| conditions in the License Agreement associated with this file.  Distribution
+| of this file or portions of this file for uses not covered by the License
+| Agreement is not allowed without a written agreement signed by an officer of
+| Miva, Inc.
+|
+| Copyright 1998-2015 Miva, Inc.  All rights reserved.
+| http://www.miva.com
+|
+| Prefix		 : MER-SHP-END-
+| Next Error Code: 114  
+|
+</MvCOMMENT>
+
+<MvFUNCTION NAME = "Module_Description" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "">
+	<MvASSIGN NAME = "l.module:code"		VALUE = "sublime_templateeditor">
+	<MvASSIGN NAME = "l.module:name"		VALUE = "Miva Merchant Template Editor for Sublime">
+	<MvASSIGN NAME = "l.module:provider"	VALUE = "Miva Merchant">
+	<MvASSIGN NAME = "l.module:version"		VALUE = "9.0000">
+	<MvASSIGN NAME = "l.module:api_ver"		VALUE = "5.72">
+	<MvASSIGN NAME = "l.module:description"	VALUE = "Use this module to edit templates using the Miva Merchant Template Editor for Sublime plugin">
+	<MvASSIGN NAME = "l.module:features"	VALUE = "json">
+</MvFUNCTION>
+
+<MvCOMMENT>
+|
+| JSON FUNCTIONS
+|
+</MvCOMMENT>
+
+<MvFUNCTION NAME = "Module_JSON" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "">
+	<MvIF EXPR = "{ g.Module_Function EQ 'TemplateList_Load_Pages' }">						<MvFUNCTIONRETURN VALUE = "{ JSON_TemplateList_Load_Pages( l.module ) }">
+	<MvELSEIF EXPR = "{ g.Module_Function EQ 'TemplateList_Load_All' }">					<MvFUNCTIONRETURN VALUE = "{ JSON_TemplateList_Load_All( l.module ) }">
+	<MvELSEIF EXPR = "{ g.Module_Function EQ 'TemplateVersionList_Load_Template' }">		<MvFUNCTIONRETURN VALUE = "{ JSON_TemplateVersionList_Load_Template( l.module ) }">
+	<MvELSEIF EXPR = "{ g.Module_Function EQ 'Template_Load_ID' }">							<MvFUNCTIONRETURN VALUE = "{ JSON_Template_Load_ID( l.module ) }">
+	<MvELSEIF EXPR = "{ g.Module_Function EQ 'Template_Update_ID' }">						<MvFUNCTIONRETURN VALUE = "{ JSON_Template_Update_ID( l.module ) }">
+	</MvIF>
+
+	<MvFUNCTIONRETURN VALUE = 1>
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "JSON_TemplateList_Load_Pages" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
+	<MvIF EXPR = "{ NOT [ g.Module_JSON ].JSON_Store_Open() }">					<MvFUNCTIONRETURN>	</MvIF>
+	<MvIF EXPR = "{ NOT [ g.Module_Admin ].CanI( 'PAGE', 1, 0, 0, 0 ) }">		<MvFUNCTIONRETURN>	</MvIF>
+
+	<MvASSIGN NAME = "g.Filter"		VALUE = "{ trim( g.Filter ) }">
+	<MvASSIGN NAME = "g.Sort"		VALUE = "{ trim( g.Sort ) }">
+	<MvASSIGN NAME = "g.Offset"		VALUE = "{ int( g.Offset ) }">
+	<MvASSIGN NAME = "g.Count"		VALUE = "{ int( g.Count ) }">
+	
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_SELECT( l.search_query, 'page.id AS page_id,
+																				 page.code AS page_code,
+																				 page.name AS page_name,
+																				 page.templ_id AS page_templ_id,
+																				 tmpl.current_id AS page_templ_current_id' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_FROM( l.search_query, g.Store_Table_Prefix $ 'Pages', 'page' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_LEFT_OUTER_JOIN( l.search_query, 'page', g.Store_Table_Prefix $ 'ManagedTemplates', 'tmpl', 'page.templ_id = tmpl.id', '' ) }">
+
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Filter( l.search_query, g.Filter, 'page_code:page.code,page_name:page.name' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_OrderBy_Fields( l.search_query, g.Sort, 'page_code:page.code,page_name:page.name', 'code' ) }"> 
+	<MvASSIGN NAME = "l.search_sql"					VALUE = "{ [ g.Module_Library_DB ].SQL_Query_Build( l.search_query, l.search_fields ) }">
+
+	<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].SQL_Query_Count( l.search_query, l.total_count ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
+	<MvELSEIF EXPR = "{ NOT [ g.Module_Library_Native_DBAPI ].DB_OPENVIEW_Range( 'Merchant', 'Pages', l.search_sql, l.search_fields, g.Offset, g.Count ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( '#Error#', g.MvOPENVIEW_Error ) }">
+	</MvIF>
+
+	<MvASSIGN NAME = "l.page_count" VALUE = 0>
+	
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Response_Start() }">
+	{
+		"total_count": <MvEVAL EXPR = "{ int( l.total_count ) }">,
+		"start_offset": <MvEVAL EXPR = "{ int( g.Offset ) }">,
+		"data":
+		[
+		<MvWHILE EXPR = "{ ( NOT Pages.d.EOF ) AND ( ( g.Count EQ 0 ) OR ( l.page_count LT g.Count ) ) }">
+
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.page_count ) }">
+				"page_id":					<MvEVAL EXPR = "{ int( Pages.d.page_id ) }">,
+				"page_code":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( Pages.d.page_code ) }">",
+				"page_name":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( Pages.d.page_name ) }">",
+				"page_templ_id":			<MvEVAL EXPR = "{ int( Pages.d.page_templ_id ) }">,
+				"page_templ_current_id":	<MvEVAL EXPR = "{ int( Pages.d.page_templ_current_id ) }">
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
+
+			<MvSKIP NAME = "Merchant" VIEW = "Pages" ROWS = 1>
+		</MvWHILE>
+		]
+	}
+	<MvCLOSEVIEW NAME = "Merchant" VIEW = "Pages">
+	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_End() }">
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "JSON_TemplateList_Load_All" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
+	<MvIF EXPR = "{ NOT [ g.Module_JSON ].JSON_Store_Open() }">					<MvFUNCTIONRETURN>	</MvIF>
+	<MvIF EXPR = "{ NOT [ g.Module_Admin ].CanI( 'PAGE', 1, 0, 0, 0 ) }">		<MvFUNCTIONRETURN>	</MvIF>
+
+	<MvASSIGN NAME = "g.Filter"		VALUE = "{ trim( g.Filter ) }">
+	<MvASSIGN NAME = "g.Sort"		VALUE = "{ trim( g.Sort ) }">
+	<MvASSIGN NAME = "g.Offset"		VALUE = "{ int( g.Offset ) }">
+	<MvASSIGN NAME = "g.Count"		VALUE = "{ int( g.Count ) }">
+	
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_SELECT( l.search_query, 'mt.id,
+																				 mt.current_id,
+																				 mt.filename' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_FROM( l.search_query, g.Store_Table_Prefix $ 'ManagedTemplates', 'mt' ) }">
+
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Filter( l.search_query, g.Filter, 'filename:mt.filename' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_OrderBy_Fields( l.search_query, g.Sort, 'id', 'id' ) }"> 
+	<MvASSIGN NAME = "l.search_sql"					VALUE = "{ [ g.Module_Library_DB ].SQL_Query_Build( l.search_query, l.search_fields ) }">
+
+	<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].SQL_Query_Count( l.search_query, l.total_count ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
+	<MvELSEIF EXPR = "{ NOT [ g.Module_Library_Native_DBAPI ].DB_OPENVIEW_Range( 'Merchant', 'ManagedTemplates', l.search_sql, l.search_fields, g.Offset, g.Count ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( '#Error#', l.search_sql $ g.MvOPENVIEW_Error ) }">
+	</MvIF>
+
+	<MvASSIGN NAME = "l.page_count" VALUE = 0>
+	
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Response_Start() }">
+	{
+		"total_count": <MvEVAL EXPR = "{ int( l.total_count ) }">,
+		"start_offset": <MvEVAL EXPR = "{ int( g.Offset ) }">,
+		"data":
+		[
+		<MvWHILE EXPR = "{ ( NOT ManagedTemplates.d.EOF ) AND ( ( g.Count EQ 0 ) OR ( l.page_count LT g.Count ) ) }">
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.page_count ) }">
+				<MvASSIGN NAME = "l.filename" VALUE = "{ ManagedTemplates.d.filename }">
+				"id":					<MvEVAL EXPR = "{ int( ManagedTemplates.d.id ) }">,
+				"current_id":			<MvEVAL EXPR = "{ int( ManagedTemplates.d.current_id ) }">,
+				"filename":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( substring_var( l.filename, 1, len_var( l.filename ) - 4 ) ) }">"
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
+
+			<MvSKIP NAME = "Merchant" VIEW = "ManagedTemplates" ROWS = 1>
+		</MvWHILE>
+		]
+	}
+	<MvCLOSEVIEW NAME = "Merchant" VIEW = "ManagedTemplates">
+	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_End() }">
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "JSON_TemplateVersionList_Load_Template" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
+	<MvIF EXPR = "{ NOT [ g.Module_JSON ].JSON_Store_Open() }">					<MvFUNCTIONRETURN>	</MvIF>
+	<MvIF EXPR = "{ NOT [ g.Module_Admin ].CanI( 'PAGE', 1, 0, 0, 0 ) }">		<MvFUNCTIONRETURN>	</MvIF>
+
+	<MvASSIGN NAME = "g.Filter"					VALUE = "{ trim( g.Filter ) }">
+	<MvASSIGN NAME = "g.Sort"					VALUE = "{ trim( g.Sort ) }">
+	<MvASSIGN NAME = "g.Offset"					VALUE = "{ int( g.Offset ) }">
+	<MvASSIGN NAME = "g.Count"					VALUE = "{ int( g.Count ) }">
+	<MvASSIGN NAME = "g.ManagedTemplate_ID"		VALUE = "{ int( g.ManagedTemplate_ID ) }">
+	
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_SELECT( l.search_query, 'mt.id,
+																				 mt.current_id,
+																				 mt.filename,
+																				 mtv.dtstamp,
+																				 mtv.notes' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_FROM( l.search_query, g.Store_Table_Prefix $ 'ManagedTemplates', 'mt' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_LEFT_OUTER_JOIN( l.search_query, 'mt', g.Store_Table_Prefix $ 'ManagedTemplateVersions', 'mtv', 'mt.id = mtv.templ_id', '' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_WHERE( l.search_query, 'mt.id = ?', 'g.ManagedTemplate_ID' ) }">
+
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Filter( l.search_query, g.Filter, 'filename:mt.filename' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_OrderBy_Fields( l.search_query, g.Sort, '-mtv.id', '-mtv.id' ) }"> 
+	<MvASSIGN NAME = "l.search_sql"					VALUE = "{ [ g.Module_Library_DB ].SQL_Query_Build( l.search_query, l.search_fields ) }">
+
+	<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].SQL_Query_Count( l.search_query, l.total_count ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
+	<MvELSEIF EXPR = "{ NOT [ g.Module_Library_Native_DBAPI ].DB_OPENVIEW_Range( 'Merchant', 'ManagedTemplates', l.search_sql, l.search_fields, g.Offset, g.Count ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( '#Error#', l.search_sql $ g.MvOPENVIEW_Error ) }">
+	</MvIF>
+
+	<MvASSIGN NAME = "l.page_count" VALUE = 0>
+	
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Response_Start() }">
+	{
+		"total_count": <MvEVAL EXPR = "{ int( l.total_count ) }">,
+		"start_offset": <MvEVAL EXPR = "{ int( g.Offset ) }">,
+		"data":
+		[
+		<MvWHILE EXPR = "{ ( NOT ManagedTemplates.d.EOF ) AND ( ( g.Count EQ 0 ) OR ( l.page_count LT g.Count ) ) }">
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.page_count ) }">
+				<MvASSIGN NAME = "l.filename" VALUE = "{ ManagedTemplates.d.filename }">
+				"id":					<MvEVAL EXPR = "{ int( ManagedTemplates.d.id ) }">,
+				"current_id":			<MvEVAL EXPR = "{ int( ManagedTemplates.d.current_id ) }">,
+				"filename":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( substring_var( l.filename, 1, len_var( l.filename ) - 4 ) ) }">",
+				"dtstamp":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( ManagedTemplates.d.dtstamp ) }">",
+				"notes":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( ManagedTemplates.d.notes ) }">"
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
+
+			<MvSKIP NAME = "Merchant" VIEW = "ManagedTemplates" ROWS = 1>
+		</MvWHILE>
+		]
+	}
+	<MvCLOSEVIEW NAME = "Merchant" VIEW = "ManagedTemplates">
+	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_End() }">
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "JSON_Template_Load_ID" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
+	<MvIF EXPR = "{ NOT [ g.Module_JSON ].JSON_Store_Open() }">					<MvFUNCTIONRETURN>	</MvIF>
+	<MvIF EXPR = "{ NOT [ g.Module_Admin ].CanI( 'PAGE', 0, 0, 1, 0 ) }">		<MvFUNCTIONRETURN>	</MvIF>
+
+	<MvASSIGN NAME = "g.ManagedTemplateVersion_ID" VALUE = "{ int( g.ManagedTemplateVersion_ID ) }">
+
+	<MvIF EXPR = "{ NOT [ g.Module_Feature_TUI_DB ].ManagedTemplateVersion_Load_ID( g.ManagedTemplateVersion_ID, l.managedtemplateversion ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
+	</MvIF>
+	
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Response_Start() }">
+	{
+		"id":					<MvEVAL EXPR = "{ int( l.managedtemplateversion:id ) }">,
+		"templ_id":				<MvEVAL EXPR = "{ int( l.managedtemplateversion:templ_id ) }">,
+		"immutable":			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Boolean( l.managedtemplateversion:immutable ) }">,
+		"dtstamp":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.managedtemplateversion:dtstamp ) }">",
+		"notes":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.managedtemplateversion:notes ) }">",
+		"source":				"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.managedtemplateversion:source ) }">"
+	}
+	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_End() }">
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "JSON_Template_Update_ID" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
+	<MvIF EXPR = "{ NOT [ g.Module_JSON ].JSON_Store_Open() }">					<MvFUNCTIONRETURN>	</MvIF>
+	<MvIF EXPR = "{ NOT [ g.Module_Admin ].CanI( 'PAGE', 0, 0, 1, 0 ) }">		<MvFUNCTIONRETURN>	</MvIF>
+
+	<MvASSIGN NAME = "g.ManagedTemplate_ID"			VALUE = "{ int( g.ManagedTemplate_ID ) }">
+	<MvASSIGN NAME = "g.Source"						VALUE = "{ [ g.Module_JSON ].JSON_Decode( g.Source ) }">
+
+	<MvIF EXPR = "{ NOT [ g.Module_Feature_TUI_DB ].ManagedTemplate_Load_ID( g.ManagedTemplate_ID, l.managedtemplate ) OR 
+					NOT [ g.Module_Feature_TUI_DB ].ManagedTemplateVersion_Load_ID( l.managedtemplate:current_id, l.managedtemplateversion ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
+	</MvIF>
+
+	<MvASSIGN NAME = "l.date" 	VALUE = "{ [ g.Module_Library_Utilities ].Format_Date( s.dyn_time_t, s.miva_language ) }">
+	<MvASSIGN NAME = "l.time" 	VALUE = "{ [ g.Module_Library_Utilities ].Format_Time( s.dyn_time_t, s.miva_language ) }">
+	<MvASSIGN NAME = "l.notes"	VALUE = "{ 'Updated by ' $ g.User:name $ ' on ' $ l.date $ ' ' $ l.time }">
+	
+	<MvIF EXPR = "{ NOT [ g.Module_Feature_TUI_MGR ].TemplateManager_Create_ManagedTemplateVersion( l.managedtemplate, l.notes, g.Source, l.managedtemplateversion:settings, l.compile_error ) }">
+		<MvIF EXPR = "{ len( l.compile_error ) }">
+			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( '#Error#', l.compile_error ) }">
+		</MvIF>
+
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
+	</MvIF>
+
+	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Success() }">
+</MvFUNCTION>
+

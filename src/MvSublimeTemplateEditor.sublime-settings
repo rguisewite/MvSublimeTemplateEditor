@@ -1,0 +1,26 @@
+{
+	"sites":
+	[
+		{
+			"name": "Domain.com",
+			"store":
+			{
+				// the store code to grab the pages from
+				"store_code": "my_store",
+
+				// the json URL to the store
+				"json_url": "http://domain.com/mm5/json.mvc",
+
+				// the store login username
+				"username": "Miva_Admin",
+
+				// the store login password
+				"password": "Miva_P@ssw0rd",
+
+				// the number of seconds to spend on blocking operations
+				"timeout": 15
+			},
+			"local_exported_templates": "/tmp"
+		}
+	]
+}

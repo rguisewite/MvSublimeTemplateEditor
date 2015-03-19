@@ -1,0 +1,10 @@
+[
+	{
+		"caption": "MvSublimeTemplateEditor: List Store Pages",
+		"command": "mv_sublime_template_editor_get_pages"
+	},
+	{
+		"caption": "MvSublimeTemplateEditor: List Store Templates",
+		"command": "mv_sublime_template_editor_get_templates"
+	}
+]
