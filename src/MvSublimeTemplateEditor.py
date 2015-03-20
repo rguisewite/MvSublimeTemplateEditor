@@ -12,7 +12,7 @@ import re
 import threading
 
 #
-# Pages / Items Quick Panel Load
+# Pages / Templates Quick Panel Load
 #
 
 class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
@@ -130,7 +130,7 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 
 		filename 	= templates[ index ][ 'filename' ]
 		current_id	= templates[ index ][ 'current_id' ]
-		thread 		= TemplateExportThread( current_id, filename, self.settings, on_complete = self.download_template )
+		thread 		= Template_Load_ID( current_id, filename, self.settings, on_complete = self.download_template )
 		thread.start()
 		ThreadProgress( thread, 'Exporting {0}' . format( filename ), '{0} exported' . format( filename ), 'Export of {0} failed' . format( filename ) )
 
@@ -191,7 +191,7 @@ class MvSublimeTemplateEditorGetTemplatesCommand( sublime_plugin.WindowCommand )
 
 		filename 			= templates[ index ][ 'filename' ]
 		current_id			= templates[ index ][ 'current_id' ]
-		thread 				= TemplateExportThread( current_id, filename, self.settings, on_complete = self.download_template )
+		thread 				= Template_Load_ID( current_id, filename, self.settings, on_complete = self.download_template )
 		thread.start()
 		ThreadProgress( thread, 'Exporting {0}' . format( filename ), '{0} exported' . format( filename ), 'Export of {0} failed' . format( filename ) )
 
@@ -269,7 +269,7 @@ class MvSublimeTemplateEditorTemplateMenu( sublime_plugin.WindowCommand ):
 
 		template			= settings.get( 'miva_managedtemplateversion_template' )
 		source 				= view.substr( sublime.Region( 0, view.size() ) )
-		thread 				= TemplateSaveID( template[ 'templ_id' ], source, self.settings, on_complete = None )
+		thread 				= Template_Update_ID( template[ 'templ_id' ], source, self.settings, on_complete = None )
 		thread.start()
 		ThreadProgress( thread, 'Uploading {0}' . format( template[ 'template_name' ] ), '{0} uploaded' . format( template[ 'template_name' ] ), 'Upload of {0} failed' . format( template[ 'template_name' ] ) )
 
@@ -287,7 +287,7 @@ class MvSublimeTemplateEditorTemplateMenu( sublime_plugin.WindowCommand ):
 
 		filename 			= templates[ index ][ 'filename' ]
 		current_id			= templates[ index ][ 'id' ]
-		thread 				= TemplateExportThread( current_id, "{0}-{1}" . format( filename, current_id ), self.settings, on_complete = self.download_template )
+		thread 				= Template_Load_ID( current_id, "{0}-{1}" . format( filename, current_id ), self.settings, on_complete = self.download_template )
 		thread.start()
 		ThreadProgress( thread, 'Exporting {0}' . format( filename ), '{0} exported' . format( filename ), 'Export of {0} failed' . format( filename ) )
 
@@ -444,7 +444,7 @@ class TemplateVersionList_Load_Template_Thread( threading.Thread ):
 
 		sublime.set_timeout( lambda: self.on_complete( templateversions ), 10 )
 
-class TemplateExportThread( threading.Thread ):
+class Template_Load_ID( threading.Thread ):
 	def __init__( self, templ_id, template_name, settings, on_complete ):
 		self.templ_id		= templ_id
 		self.template_name	= template_name
@@ -472,42 +472,7 @@ class TemplateExportThread( threading.Thread ):
 
 		sublime.set_timeout( lambda: self.on_complete( template ), 10 )
 
-class FileDownloadThread( threading.Thread ):
-	def __init__( self, file_name, settings, on_complete ):
-		self.file_name		= file_name
-		self.settings		= settings
-		self.on_complete	= on_complete
-		self.error			= False
-		threading.Thread.__init__( self )
-
-	def run( self ):
-		ftp_settings = self.settings.get( 'ftp', {} )
-
-		ftp_settings.setdefault( 'host', '' )
-		ftp_settings.setdefault( 'username', '' )
-		ftp_settings.setdefault( 'password', '' )
-		ftp_settings.setdefault( 'exported_templates', '' )
-		ftp_settings.setdefault( 'server_type', 'unix' )
-		ftp_settings.setdefault( 'timeout', 15 )
-
-		server_directory	= ftp_settings[ 'exported_templates' ]
-		local_directory		= self.settings.get( 'local_exported_templates', '' )
-
-		server_file_path 	= join_path( server_directory, self.file_name, ftp_settings[ 'server_type' ] )
-		local_file_path		= os.path.join( local_directory, self.file_name )
-		ftp 				= FTP( ftp_settings[ 'host' ], ftp_settings[ 'username' ], ftp_settings[ 'password' ], ftp_settings[ 'timeout' ] )
-
-		print( 'Downloading file {0}' . format( server_file_path ) )
-
-		if not ftp.download_file( server_file_path, local_file_path ):
-			self.error = True
-			return sublime.error_message( ftp.error )
-
-		print( 'Downloaded complete' )
-
-		sublime.set_timeout( lambda: self.on_complete( local_file_path ) )
-
-class TemplateSaveID( threading.Thread ):
+class Template_Update_ID( threading.Thread ):
 	def __init__( self, managedtemplate_id, source, settings, on_complete ):
 		self.managedtemplate_id		= managedtemplate_id
 		self.source			= source
