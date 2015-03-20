@@ -35,6 +35,7 @@
 
 <MvFUNCTION NAME = "Module_JSON" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "">
 	<MvIF EXPR = "{ g.Module_Function EQ 'TemplateList_Load_Pages' }">						<MvFUNCTIONRETURN VALUE = "{ JSON_TemplateList_Load_Pages( l.module ) }">
+	<MvELSEIF EXPR = "{ g.Module_Function EQ 'TemplateList_Load_Page' }">					<MvFUNCTIONRETURN VALUE = "{ JSON_TemplateList_Load_Page( l.module ) }">
 	<MvELSEIF EXPR = "{ g.Module_Function EQ 'TemplateList_Load_All' }">					<MvFUNCTIONRETURN VALUE = "{ JSON_TemplateList_Load_All( l.module ) }">
 	<MvELSEIF EXPR = "{ g.Module_Function EQ 'TemplateVersionList_Load_Template' }">		<MvFUNCTIONRETURN VALUE = "{ JSON_TemplateVersionList_Load_Template( l.module ) }">
 	<MvELSEIF EXPR = "{ g.Module_Function EQ 'Template_Load_ID' }">							<MvFUNCTIONRETURN VALUE = "{ JSON_Template_Load_ID( l.module ) }">
@@ -105,11 +106,32 @@
 	<MvASSIGN NAME = "g.Sort"		VALUE = "{ trim( g.Sort ) }">
 	<MvASSIGN NAME = "g.Offset"		VALUE = "{ int( g.Offset ) }">
 	<MvASSIGN NAME = "g.Count"		VALUE = "{ int( g.Count ) }">
+
+	<MvIF EXPR = "{ g.Count EQ 0 }">
+		<MvASSIGN NAME = "g.Count"	VALUE = 1000>
+	</MvIF>
 	
 	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_SELECT( l.search_query, 'mt.id,
 																				 mt.current_id,
 																				 mt.filename' ) }">
 	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_FROM( l.search_query, g.Store_Table_Prefix $ 'ManagedTemplates', 'mt' ) }">
+
+	<MvCOMMENT>
+	|
+	| Filter out Product Header/Footer templates (there could potentially be a huge number of these)
+	|
+	</MvCOMMENT>
+
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_WHERE( l.search_query, '( mt.filename NOT LIKE \'p0%\' AND
+																				  mt.filename NOT LIKE \'p1%\' AND
+																				  mt.filename NOT LIKE \'p2%\' AND
+																				  mt.filename NOT LIKE \'p3%\' AND
+																				  mt.filename NOT LIKE \'p4%\' AND
+																				  mt.filename NOT LIKE \'p5%\' AND
+																				  mt.filename NOT LIKE \'p6%\' AND
+																				  mt.filename NOT LIKE \'p7%\' AND
+																				  mt.filename NOT LIKE \'p8%\' AND
+																				  mt.filename NOT LIKE \'p9%\' )', '' ) }">
 
 	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Filter( l.search_query, g.Filter, 'filename:mt.filename' ) }">
 	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_OrderBy_Fields( l.search_query, g.Sort, 'id', 'id' ) }"> 
@@ -200,6 +222,88 @@
 	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_End() }">
 </MvFUNCTION>
 
+<MvFUNCTION NAME = "JSON_TemplateList_Load_Page" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
+	<MvIF EXPR = "{ NOT [ g.Module_JSON ].JSON_Store_Open() }">					<MvFUNCTIONRETURN>	</MvIF>
+	<MvIF EXPR = "{ NOT [ g.Module_Admin ].CanI( 'PAGE', 1, 0, 0, 0 ) }">		<MvFUNCTIONRETURN>	</MvIF>
+
+	<MvASSIGN NAME = "g.Page_Code" VALUE = "{ [ g.Module_JSON ].JSON_Decode( g.Page_Code ) }">
+
+	<MvIF EXPR = "{ NOT [ g.Module_Feature_TUI_DB ].Page_Load_Code( g.Page_Code, l.page ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
+	</MvIF>
+
+	<MvASSIGN NAME = "l.original_module_feature_tui_db" 	VALUE = "{ g.Module_Feature_TUI_DB }">
+	<MvASSIGN NAME = "l.original_feature_tui_db" 			VALUE = "{ g.Feature_TUI_DB }">
+	<MvASSIGN NAME = "l.original_feature_filename_tui_db" 	VALUE = "{ g.Feature_Filename_TUI_DB }">
+
+	<MvASSIGN NAME = "g.Module_Feature_TUI_DB"				VALUE = "{ g.Module_Root $ l.module:module }">
+	<MvASSIGN NAME = "g.Feature_TUI_DB"						VALUE = "{ g.Module_Root $ l.module:module }">
+	<MvASSIGN NAME = "g.Feature_Filename_TUI_DB"			VALUE = "{ g.Module_Root $ l.module:module }">
+
+	<MvFOREACH ITERATOR = "l.item" ARRAY = "l.items" COUNT = "{ [ g.Module_Feature_TUI_DB ].ItemModuleList_Load_Page_Active( l.page:id, l.items ) }">
+		<MvREFERENCEARRAY NAME = "l.settings" VARIABLE = "l.page">
+			<MvMEMBER NAME = "settings">
+			<MvMEMBER NAME = "{ l.item:item_code }">
+		</MvREFERENCEARRAY>
+
+		<MvCAPTURE VARIABLE = "l.discard">
+			<MvDO FILE = "{ g.Module_Root $ l.item:module }" NAME = "l.component_tabs" VALUE = "{ ComponentModule_Tabs( l.items, l.item:item_code, l.settings ) }">
+			<MvIF EXPR = "{ len( l.component_tabs ) }">
+				<MvFOREACH ITERATOR = "l.tab" ARRAY = "l.tabs" COUNT = "{ [ g.Module_Library_Utilities ].SplitStringAndTrim( l.component_tabs, ',', l.tabs ) }">
+					<MvASSIGN NAME = "g.Tab" 				VALUE = "{ l.tab }">
+
+					<MvASSIGN NAME = "l.field_prefix"		VALUE = "Page_Settings:">
+
+					<MvREFERENCEARRAY NAME = "l.settings" 	VARIABLE = "l.page">
+						<MvMEMBER NAME = "settings">
+						<MvMEMBER NAME = "{ l.item:item_code }">
+					</MvREFERENCEARRAY>
+
+					<MvASSIGN NAME = "l.load_fields"		VALUE = "{ miva_array_search( g.Page_Items_Initialized, 1, l.initialized_item_code, 'l.initialized_item_code EQ l.item:item_code' ) EQ 0 }">
+					<MvASSIGN NAME = "l.ignore"				VALUE = "{ [ g.Module_Root $ l.item:module ].ComponentModule_Content( l.item, l.item:item_code, g.Tab, l.load_fields, l.field_prefix, l.empty, l.settings ) }">
+
+					<MvIF EXPR = "{ l.load_fields }">
+						<MvASSIGN NAME = "l.null"			VALUE = "{ miva_array_insert( g.Page_Items_Initialized, l.item:item_code, -1 ) }">
+					</MvIF>
+				</MvFOREACH>
+			</MvIF>
+		</MvCAPTURE>
+	</MvFOREACH>
+
+	<MvASSIGN NAME = "g.Module_Feature_TUI_DB" 				VALUE = "{ l.original_module_feature_tui_db }">
+	<MvASSIGN NAME = "g.Feature_TUI_DB" 					VALUE = "{ l.original_feature_tui_db }">
+	<MvASSIGN NAME = "g.Feature_Filename_TUI_DB" 			VALUE = "{ l.original_feature_filename_tui_db }">
+
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Response_Start() }">
+	{
+		"data":
+		[
+			<MvASSIGN NAME = "l.null" VALUE = "{ [ g.Module_Feature_TUI_DB ].ManagedTemplate_Load_ID( l.page:templ_id, l.managedtemplate ) }">
+				
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.page_count ) }">
+				"id": 			<MvEVAL EXPR = "{ int( l.page:templ_id ) }">,
+				"current_id": 	<MvEVAL EXPR = "{ int( l.managedtemplate:current_id ) }">,
+				"display": 		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ ': ' $ l.page:name $ ' (Main Template)' ) }">",
+				"filename":		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ '-page.htm' ) }">"
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
+
+			<MvFOREACH ITERATOR = "l.template_id" ARRAY = "g.Session:cache:sublime_templateeditor:page:templates" COUNT = "{ g.Session:cache:sublime_templateeditor:page:template_count }">
+				<MvIF EXPR = "{ NOT [ g.Module_Feature_TUI_DB ].ManagedTemplate_Load_ID( l.template_id, l.managedtemplate ) }">
+					<MvFOREACHCONTINUE>
+				</MvIF>
+
+				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.page_count ) }">
+					"id": 			<MvEVAL EXPR = "{ int( l.template_id ) }">,
+					"current_id": 	<MvEVAL EXPR = "{ int( l.managedtemplate:current_id ) }">,
+					"display": 		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ ': ' $ l.managedtemplate:filename ) }">",
+				"filename":		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ '-' $ substring_var( l.managedtemplate:filename, 1, len_var( l.managedtemplate:filename ) - 4 ) $ '-item.htm' ) }">"
+				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
+			</MvFOREACH>
+		]
+	}
+	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_End() }">
+</MvFUNCTION>
+
 <MvFUNCTION NAME = "JSON_Template_Load_ID" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
 	<MvIF EXPR = "{ NOT [ g.Module_JSON ].JSON_Store_Open() }">					<MvFUNCTIONRETURN>	</MvIF>
 	<MvIF EXPR = "{ NOT [ g.Module_Admin ].CanI( 'PAGE', 0, 0, 1, 0 ) }">		<MvFUNCTIONRETURN>	</MvIF>
@@ -249,3 +353,17 @@
 	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Success() }">
 </MvFUNCTION>
 
+<MvFUNCTION NAME = "TemplateEditorSession_AppendTemplateID" PARAMETERS = "template_id" STANDARDOUTPUTLEVEL = "">
+	<MvIF EXPR = "{ miva_array_search( g.Session:cache:sublime_templateeditor:page:templates, 1, l.saved_template_id, 'l.template_id EQ l.saved_template_id' ) }">
+		<MvFUNCTIONRETURN>
+	</MvIF>
+
+	<MvASSIGN NAME = "g.Session:cache:sublime_templateeditor:page:template_count" 	VALUE = "{ int( g.Session:cache:sublime_templateeditor:page:template_count ) + 1 }">
+	<MvASSIGNARRAY NAME = "g.Session" 												VALUE = "{ l.template_id }">
+		<MvMEMBER NAME = "cache">
+		<MvMEMBER NAME = "sublime_templateeditor">
+		<MvMEMBER NAME = "page">
+		<MvMEMBER NAME = "templates">
+		<MvDIMENSION INDEX = "{ g.Session:cache:sublime_templateeditor:page:template_count }">
+	</MvASSIGNARRAY>
+</MvFUNCTION>

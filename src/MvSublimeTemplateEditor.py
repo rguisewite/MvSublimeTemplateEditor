@@ -78,15 +78,65 @@ class MvSublimeTemplateEditorGetPagesCommand( sublime_plugin.WindowCommand ):
 		if index == -1:
 			return
 
-		page_code 	= pages[ index ][ 'page_code' ]
-		page_templ_current_id	= pages[ index ][ 'page_templ_current_id' ]
-		thread 		= TemplateExportThread( page_templ_current_id, page_code, self.settings, on_complete = self.download_page )
-		thread.start()
-		ThreadProgress( thread, 'Exporting {0}' . format( page_code ), '{0} exported' . format( page_code ), 'Export of {0} failed' . format( page_code ) )
+		# Load templates for page
+		page_code = pages[ index ][ 'page_code' ]
+		self.window.run_command( 'mv_sublime_template_editor_get_page', { 'site': self.site, 'page_code': page_code } )
 
-	def download_page( self, template ):
+	def show_quick_panel( self, entries, on_select, on_highlight = None ):
+		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, on_highlight = on_highlight ), 10 )
+
+class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
+	def run( self, site = None, page_code = None ):
+		self.site 		= site
+		self.page_code 	= page_code
+		settings 		= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+
+		if self.page_code is None:
+			return
+
+		if site is None:
+			if settings.get( 'sites' ) is not None:
+				return self.window.run_command( 'mv_sublime_template_editor_get_sites', { 'type': 'page' } )
+
+			self.settings = settings
+		else:
+			try:
+				for site_settings in settings.get( 'sites', [] ):
+					if site_settings[ 'name' ] == site:
+						self.settings = site_settings
+						break
+			except KeyError:
+				sublime.error_message( 'Site not found' )
+				return
+			except Exception:
+				sublime.error_message( 'Invalid configuration file' )
+				return
+
+		thread = TemplateList_Load_Page_Thread( page_code, self.settings, on_complete = self.templates_quick_panel )
+		thread.start()
+		ThreadProgress( thread, 'Loading templates', error_message = 'Failed loading templates' )
+
+	def templates_quick_panel( self, templates ):
+		entries = []
+
+		for template in templates:
+			entries.extend( [ '{0}' . format( template[ 'display' ] ) ] )
+
+		self.show_quick_panel( entries, lambda index: self.templates_callback( templates, index ) )
+
+	def templates_callback( self, templates, index ):
+		if index == -1:
+			return
+
+		filename 	= templates[ index ][ 'filename' ]
+		current_id	= templates[ index ][ 'current_id' ]
+		thread 		= TemplateExportThread( current_id, filename, self.settings, on_complete = self.download_template )
+		thread.start()
+		ThreadProgress( thread, 'Exporting {0}' . format( filename ), '{0} exported' . format( filename ), 'Export of {0} failed' . format( filename ) )
+
+	def download_template( self, template ):
 		local_directory		= self.settings.get( 'local_exported_templates', '' )
-		file_name 			= '{0}-page.htm' . format ( template[ 'template_name' ] )
+		file_name 			= '{0}' . format ( template[ 'template_name' ] )
 		local_file_path		= os.path.join( local_directory, file_name )
 		with open( local_file_path, 'w' ) as fh:
 				fh.write( template[ 'source' ] )
@@ -314,6 +364,31 @@ class TemplateList_Load_Pages_Thread( threading.Thread ):
 
 		sublime.set_timeout( lambda: self.on_complete( pages ), 10 )
 
+class TemplateList_Load_Page_Thread( threading.Thread ):
+	def __init__( self, page_code, settings, on_complete ):
+		self.page_code		= page_code
+		self.settings 		= settings
+		self.on_complete	= on_complete
+		self.error			= False
+		threading.Thread.__init__( self )
+
+	def run( self ):
+		store_settings = self.settings.get( 'store' )
+
+		print( 'Retrieving templates' )
+
+		result, response, error = make_json_request( store_settings, 'Module', '&Count=0&Module_Code=sublime_templateeditor&Module_Function=TemplateList_Load_Page&Page_Code={0}&TemporarySession=1' . format( urllib.parse.quote_plus( self.page_code.encode( 'utf8' ) ) ) )
+
+		if not result:
+			self.error = True
+			return sublime.error_message( error )
+
+		templates = response[ 'data' ][ 'data' ]
+
+		print( 'Retrieved {0} templates' . format( len( templates ) ) )
+
+		sublime.set_timeout( lambda: self.on_complete( templates ), 10 )
+
 class TemplateList_Load_All_Thread( threading.Thread ):
 	def __init__( self, settings, on_complete ):
 		self.settings 		= settings
@@ -501,6 +576,8 @@ def make_json_request( store_settings, function, other_data = '' ):
 
 		url = json_url + 'Store_Code={store_code}&Function={function}&Session_Type=admin&Username={username}&Password={password}' \
 			  . format( store_code = urllib.parse.quote_plus( store_code ),  function = urllib.parse.quote_plus( function ), username = urllib.parse.quote_plus( username ), password = urllib.parse.quote_plus( password ) )
+
+		print( url + other_data )
 
 		try:
 			req = urllib2.Request( url, other_data.encode( 'utf8' ) )
