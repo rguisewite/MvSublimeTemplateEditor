@@ -145,6 +145,7 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 		view_settings.set( 'miva_managedtemplateversion', "true" )
 		view_settings.set( 'miva_managedtemplateversion_template', template )
 		view_settings.set( 'miva_site', self.site )
+		view_settings.set( 'miva_managedtemplateversion_page_code', self.page_code )
 
 	def show_quick_panel( self, entries, on_select, on_highlight = None ):
 		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, on_highlight = on_highlight ), 10 )
@@ -241,6 +242,9 @@ class MvSublimeTemplateEditorTemplateMenu( sublime_plugin.WindowCommand ):
 
 		commands		= [ 'Commit', 'Versions' ]
 
+		if self.view_settings.has( 'miva_managedtemplateversion_page_code' ):
+			commands.append( 'Templates In Page "{0}"' . format( self.view_settings.get( 'miva_managedtemplateversion_page_code' ) ) )
+
 		sublime.set_timeout( lambda: self.window.show_quick_panel( commands, lambda index: self.command_callback( commands, index ) ) )
 
 	def command_callback( self, commands, index ):
@@ -249,6 +253,8 @@ class MvSublimeTemplateEditorTemplateMenu( sublime_plugin.WindowCommand ):
 
 		if commands[ index ] == 'Commit':
 			self.on_save( self.view )
+		elif commands[ index ] == 'Templates In Page "{0}"' . format( self.view_settings.get( 'miva_managedtemplateversion_page_code' ) ):
+			self.window.run_command( 'mv_sublime_template_editor_get_page', { 'site': self.site, 'page_code': self.view_settings.get( 'miva_managedtemplateversion_page_code' ) } )
 		elif commands[ index ] == 'Versions':
 			thread = TemplateVersionList_Load_Template_Thread( self.view_settings.get( 'miva_managedtemplateversion_template' )[ 'templ_id' ], self.settings, on_complete = self.versions_quick_panel )
 			thread.start()
