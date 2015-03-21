@@ -11,56 +11,196 @@ import urllib.parse
 import re
 import threading
 
+import os, random, string
+from subprocess import Popen, PIPE, STDOUT
+
+#
+#from PBKDF2 import PBKDF2
+#from Crypto.Cipher import AES
+#import os
+#
+#salt = os.urandom(8)    # 64-bit salt
+#key = PBKDF2("P@ssw0rd.", salt).read(32) # 256-bit key
+#iv = os.urandom(16)     # 128-bit IV
+#cipher = AES.new(key, AES.MODE_CBC, iv)
+#
+
+# Check to see if we're in Sublime Text 3
+ST3 				= int(sublime.version()) >= 3000
+master_password 	= None
+
 #
 # Pages / Templates Quick Panel Load
 #
 
 class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 	def run( self, type = 'pages' ):
-		self.type		= type
+		self.type 		= type
 		self.settings 	= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
-		sites			= []
+
+		if not self.settings.has( 'password_verification' ):
+			sublime.error_message( 'Master password not set. Close this dialog and enter a master password' )
+			return self.set_master_password()
+
+		self.load_sites()
+
+	def load_sites( self ):
+		global master_password
+		#self.settings.set( 'Test', 'MyValue' )
+		#sublime.save_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+		self.sites		= []
 
 		for site in self.settings.get( 'sites', [] ):
-			sites.append( site[ 'name' ] )
+			self.sites.append( site[ 'name' ] )
 
-		if not sites:
-			sublime.error_message( 'No sites configured' )
-			return
+		self.sites.append( 'Add Store' )
 
-		sublime.set_timeout( lambda: self.window.show_quick_panel( sites, lambda index: self.site_callback( sites, index ) ) )
+		if master_password == None:
+			return self.prompt_master_pass()
 
-	def site_callback( self, sites, index ):
+		self.show_sites()
+
+	def show_sites( self ):
+		sublime.set_timeout( lambda: self.window.show_quick_panel( self.sites, lambda index: self.site_callback( self.sites, index ) ) )
+
+	def prompt_master_pass( self ):
+		self.show_input_panel( 'Enter Master Password', '', lambda password: self.prompt_master_pass_callback( password ), None, None )
+
+	def prompt_master_pass_callback( self, password ):
+		global master_password
+		try:
+			success, data, error_message = crypto( password, self.settings.get( 'password_verification' ), '-d' )
+
+			if not success:
+				sublime.error_message( error_message )
+				return self.prompt_master_pass()
+			elif data.decode( encoding='UTF-8' ) != 'VERIFIED':
+				sublime.error_message( 'Invalid master password' )
+				return self.prompt_master_pass()
+
+		except KeyError:
+			sublime.error_message( 'Master password not set. Close this dialog and enter a master password' )
+			return self.set_master_password()
+
+		master_password = password
+		self.show_sites()
+
+	def site_callback( self, sites, index):
 		if index == -1:
 			return
 
+		if sites[ index ] == 'Add Store':
+			return self.add_store()
+
+		settings 	= None
+		site 		= sites[ index ]
+
+		try:
+			for site_settings in self.settings.get( 'sites', [] ):
+				if site_settings[ 'name' ] == site:
+					settings = site_settings
+					break
+		except KeyError:
+			sublime.error_message( 'Site not found' )
+			return
+		except Exception:
+			sublime.error_message( 'Invalid configuration file' )
+			return
+
+		if settings == None:
+			sublime.error_message( 'Site not found' )
+			return
+
 		if self.type == 'pages':
-			self.window.run_command( 'mv_sublime_template_editor_get_pages', { 'site': sites[ index ] } )
+			self.window.run_command( 'mv_sublime_template_editor_get_pages', { 'settings': settings } )
 		elif self.type == 'templates':
-			self.window.run_command( 'mv_sublime_template_editor_get_templates', { 'site': sites[ index ] } )
+			self.window.run_command( 'mv_sublime_template_editor_get_templates', { 'settings': settings } )
+
+	def set_master_password( self ):
+		self.show_input_panel( 'Set Master Password', '', lambda password: self.set_master_password_callback( password ), None, None )
+
+	def set_master_password_callback( self, master_pass ):
+		global master_password
+		success, data, error_message = crypto( master_pass, 'VERIFIED', '-e' )
+
+		if not success:
+			return sublime.error_message( error_message )
+
+		master_password = master_pass
+		self.settings.set( 'password_verification', data.decode(encoding='UTF-8') )
+		self.settings.set( 'sites', [] )
+		sublime.save_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+
+		self.add_store()
+
+	def add_store( self ):
+		site 			= {}
+		site[ 'store' ] = {}
+
+		self.show_input_panel( 'Enter Store Name', '', lambda store_name: self.add_store_callback( site, store_name ), None, None )
+
+	def add_store_callback( self, site, store_name ):
+		site[ 'name' ] = store_name
+		self.add_store_template_location( site )
+
+	def add_store_template_location( self, site ):
+		self.show_input_panel( 'Enter Template Export Location', '', lambda entered_text: self.add_store_template_location_callback( site, entered_text ), None, None )
+
+	def add_store_template_location_callback( self, site, template_location = '/tmp/' ):
+		site[ 'local_exported_templates' ] = template_location
+		self.add_store_code( site )
+
+	def add_store_code( self , site ):
+		self.show_input_panel( 'Enter Store Code', '', lambda entered_text: self.add_store_code_callback( site, entered_text ), None, None )
+
+	def add_store_code_callback( self, site, store_code ):
+		site[ 'store' ][ 'store_code' ] = store_code
+		self.add_store_jsonurl( site )
+
+	def add_store_jsonurl( self, site ):
+		self.show_input_panel( 'Enter JSON URL to Store', '', lambda entered_text: self.add_store_jsonurl_callback( site, entered_text ), None, None )
+
+	def add_store_jsonurl_callback( self, site, json_url ):
+		site[ 'store' ][ 'json_url' ] = json_url
+		self.add_store_username( site )
+
+	def add_store_username( self, site ):
+		self.show_input_panel( 'Enter Username', '', lambda entered_text: self.add_store_username_callback( site, entered_text ), None, None )
+
+	def add_store_username_callback( self, site, username ):
+		site[ 'store' ][ 'username' ] = username
+		self.add_store_password( site )
+
+	def add_store_password( self, site ):
+		self.show_input_panel( 'Enter Password', '', lambda entered_text: self.add_store_password_callback( site, entered_text ), None, None )
+
+	def add_store_password_callback( self, site, password ):
+		global master_password
+		success, data, error_message = crypto( master_password, password, '-e' )
+
+		if not success:
+			return sublime.error_message( error_message )
+
+		site[ 'store' ][ 'password' ] 	= data.decode( encoding='UTF-8' )
+		site[ 'store' ][ 'timeout' ]	= 15
+
+		sites = self.settings.get( 'sites' )
+		sites.append( site )
+		self.settings.set( 'sites', sites )
+		sublime.save_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+
+		self.load_sites()
+
+	def show_input_panel( self, caption, initial_text, on_done, on_change = None, on_cancel = None ):
+		sublime.set_timeout( lambda: self.window.show_input_panel( caption, initial_text, on_done, on_change, on_cancel ), 10 )
+
 
 class MvSublimeTemplateEditorGetPagesCommand( sublime_plugin.WindowCommand ):
-	def run( self, site = None ):
-		self.site = site
-		settings = sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+	def run( self, settings = None ):
+		self.settings = settings
 
-		if site is None:
-			if settings.get( 'sites' ) is not None:
-				return self.window.run_command( 'mv_sublime_template_editor_get_sites', { 'type': 'pages' } )
-
-			self.settings = settings
-		else:
-			try:
-				for site_settings in settings.get( 'sites', [] ):
-					if site_settings[ 'name' ] == site:
-						self.settings = site_settings
-						break
-			except KeyError:
-				sublime.error_message( 'Site not found' )
-				return
-			except Exception:
-				sublime.error_message( 'Invalid configuration file' )
-				return
+		if self.settings is None:
+			return self.window.run_command( 'mv_sublime_template_editor_get_sites', { 'type': 'pages' } )
 
 		thread = TemplateList_Load_Pages_Thread( self.settings, on_complete = self.pages_quick_panel )
 		thread.start()
@@ -80,14 +220,14 @@ class MvSublimeTemplateEditorGetPagesCommand( sublime_plugin.WindowCommand ):
 
 		# Load templates for page
 		page_code = pages[ index ][ 'page_code' ]
-		self.window.run_command( 'mv_sublime_template_editor_get_page', { 'site': self.site, 'page_code': page_code } )
+		self.window.run_command( 'mv_sublime_template_editor_get_page', { 'settings': self.settings, 'page_code': page_code } )
 
 	def show_quick_panel( self, entries, on_select, on_highlight = None ):
 		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, on_highlight = on_highlight ), 10 )
 
 class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
-	def run( self, site = None, page_code = None ):
-		self.site 			= site
+	def run( self, settings = None, page_code = None ):
+		self.settings 		= settings
 		self.page_code 		= page_code
 		self.current_view 	= self.window.active_view()
 		self.selected_index	= 0
@@ -97,23 +237,8 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 		if self.page_code is None:
 			return
 
-		if site is None:
-			if settings.get( 'sites' ) is not None:
-				return self.window.run_command( 'mv_sublime_template_editor_get_sites', { 'type': 'page' } )
-
-			self.settings = settings
-		else:
-			try:
-				for site_settings in settings.get( 'sites', [] ):
-					if site_settings[ 'name' ] == site:
-						self.settings = site_settings
-						break
-			except KeyError:
-				sublime.error_message( 'Site not found' )
-				return
-			except Exception:
-				sublime.error_message( 'Invalid configuration file' )
-				return
+		if settings is None:
+			return
 
 		thread = TemplateList_Load_Page_Thread( page_code, self.settings, on_complete = self.templates_quick_panel )
 		thread.start()
@@ -172,34 +297,18 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 		view_settings 		= view.settings()
 		view_settings.set( 'miva_managedtemplateversion', "true" )
 		view_settings.set( 'miva_managedtemplateversion_template', template[ 'record' ] )
-		view_settings.set( 'miva_site', self.site )
+		view_settings.set( 'miva_settings', self.settings )
 		view_settings.set( 'miva_managedtemplateversion_page_code', self.page_code )
 
 	def show_quick_panel( self, entries, on_select, on_highlight = None, selected_index = 0 ):
 		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, 0, selected_index, on_highlight ), 10 )
 
 class MvSublimeTemplateEditorGetTemplatesCommand( sublime_plugin.WindowCommand ):
-	def run( self, site = None ):
-		self.site = site
-		settings = sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+	def run( self, settings = None ):
+		self.settings = settings
 
-		if site is None:
-			if settings.get( 'sites' ) is not None:
-				return self.window.run_command( 'mv_sublime_template_editor_get_sites', { 'type': 'templates' } )
-
-			self.settings = settings
-		else:
-			try:
-				for site_settings in settings.get( 'sites', [] ):
-					if site_settings[ 'name' ] == site:
-						self.settings = site_settings
-						break
-			except KeyError:
-				sublime.error_message( 'Site not found' )
-				return
-			except Exception:
-				sublime.error_message( 'Invalid configuration file' )
-				return
+		if self.settings is None:
+			return self.window.run_command( 'mv_sublime_template_editor_get_sites', { 'type': 'templates' } )
 
 		thread = TemplateList_Load_All_Thread( self.settings, on_complete = self.templates_quick_panel )
 		thread.start()
@@ -233,7 +342,7 @@ class MvSublimeTemplateEditorGetTemplatesCommand( sublime_plugin.WindowCommand )
 		view_settings = view.settings()
 		view_settings.set( 'miva_managedtemplateversion', "true" )
 		view_settings.set( 'miva_managedtemplateversion_template', template )
-		view_settings.set( 'miva_site', self.site )
+		view_settings.set( 'miva_settings', self.settings )
 
 	def show_quick_panel( self, entries, on_select, on_highlight = None ):
 		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, on_highlight = on_highlight ), 10 )
@@ -250,23 +359,10 @@ class MvSublimeTemplateEditorTemplateMenu( sublime_plugin.WindowCommand ):
 		if not self.view_settings.has( 'miva_managedtemplateversion' ):
 			return
 
-		self.settings 	= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
-		self.site		= self.view_settings.get( 'miva_site' )
+		self.settings	= self.view_settings.get( 'miva_settings' )
 
-		if self.site is None:
+		if self.settings is None:
 			return
-		else:
-			try:
-				for site_settings in self.settings.get( 'sites', [] ):
-					if site_settings[ 'name' ] == self.site:
-						self.settings = site_settings
-						break
-			except KeyError:
-				sublime.error_message( 'Site not found' )
-				return
-			except Exception:
-				sublime.error_message( 'Invalid configuration file' )
-				return
 
 		commands		= [ 'Commit', 'Versions' ]
 
@@ -282,7 +378,7 @@ class MvSublimeTemplateEditorTemplateMenu( sublime_plugin.WindowCommand ):
 		if commands[ index ] == 'Commit':
 			self.on_save( self.view )
 		elif commands[ index ] == 'Templates In Page "{0}"' . format( self.view_settings.get( 'miva_managedtemplateversion_page_code' ) ):
-			self.window.run_command( 'mv_sublime_template_editor_get_page', { 'site': self.site, 'page_code': self.view_settings.get( 'miva_managedtemplateversion_page_code' ) } )
+			self.window.run_command( 'mv_sublime_template_editor_get_page', { 'settings': self.settings, 'page_code': self.view_settings.get( 'miva_managedtemplateversion_page_code' ) } )
 		elif commands[ index ] == 'Versions':
 			thread = TemplateVersionList_Load_Template_Thread( self.view_settings.get( 'miva_managedtemplateversion_template' )[ 'templ_id' ], self.settings, on_complete = self.versions_quick_panel )
 			thread.start()
@@ -329,7 +425,7 @@ class MvSublimeTemplateEditorTemplateMenu( sublime_plugin.WindowCommand ):
 		view_settings = view.settings()
 		view_settings.set( 'miva_managedtemplateversion', "true" )
 		view_settings.set( 'miva_managedtemplateversion_template', template )
-		view_settings.set( 'miva_site', self.site )
+		view_settings.set( 'miva_settings', self.settings )
 
 	def show_quick_panel( self, entries, on_select, on_highlight = None ):
 		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, on_highlight = on_highlight ), 10 )
@@ -525,6 +621,57 @@ class Template_Update_ID( threading.Thread ):
 # Helper Functions
 #
 
+#
+# Encrypt/Decrypt using OpenSSL -aes128 and -base64
+# EG similar to running this CLI command:
+#   echo "data" | openssl enc -e -aes128 -base64 -pass "pass:lolcats"
+#
+def crypto( password, data, enc_flag = '-e' ):
+	settings 				= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+	cipher 					= settings.get('cipher')
+	openssl_command 		= os.path.normpath( settings.get('openssl_command') )
+
+	# pass the password as an ENV variable, for better security
+	envVar 					= ''.join( random.sample( string.ascii_uppercase, 23 ) )
+	os.environ[ envVar ] 	= password
+	_pass 					= "env:%s" % envVar
+
+	try:
+		if isinstance(data, str):
+			data_handled	= data.encode( 'utf-8' )
+		else:
+			data_handled	= data
+		openssl 			= Popen( [openssl_command, "enc", enc_flag, cipher, "-base64", "-pass", _pass], stdin=PIPE, stdout=PIPE, stderr=PIPE )
+		result, error 		= openssl.communicate( data_handled )
+
+		del os.environ[envVar] # get rid of the temporary ENV var
+	except IOError as e:
+		return False, None, 'Error: %s' % e
+	except OSError as e:
+		error_message = """
+ Please verify that you have installed OpenSSL.
+ Attempting to execute: %s
+ Error: %s
+		""" % (openssl_command, e[1])
+		return False, None, error_message
+
+	# probably a wrong password was entered
+	if error:
+		_err = error.splitlines()[0]
+
+		if ST3:
+			_err = str(_err)
+
+		if _err.find('unknown option') != -1:
+			return False, None, 'Error: ' + _err
+		elif _err.find("WARNING:") != -1:
+			# skip WARNING's
+			return True, result, None
+
+		return False, None, 'Error: Wrong password'
+
+	return True, result, None
+
 def join_path( dir_path, file_path, server_type ):
 	platform = sublime.platform()
 
@@ -541,23 +688,9 @@ def join_path( dir_path, file_path, server_type ):
 
 	return os.path.join( dir_path, file_path )
 
-def determine_settings( dir_name ):
-	settings 	= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
-	sites		= settings.get( 'sites' )
-
-	if sites is None:
-		return settings
-
-	try:
-		for site in sites:
-			if site[ 'local_exported_templates' ] == dir_name:
-				return site
-	except:
-		pass
-
-	return None
-
 def make_json_request( store_settings, function, other_data = '' ):
+		global master_password
+
 		store_settings.setdefault( 'store_code', '' )
 		store_settings.setdefault( 'json_url', '' )
 		store_settings.setdefault( 'username', '' )
@@ -569,6 +702,11 @@ def make_json_request( store_settings, function, other_data = '' ):
 		username	= store_settings[ 'username' ]
 		password	= store_settings[ 'password' ]
 		timeout		= store_settings[ 'timeout' ]
+
+		success, decoded_password, error_message = crypto( master_password, password, '-d' )
+
+		if success:
+			password = decoded_password.decode( encoding='UTF-8')
 
 		if not json_url.endswith( '?' ):
 			json_url += '?'
