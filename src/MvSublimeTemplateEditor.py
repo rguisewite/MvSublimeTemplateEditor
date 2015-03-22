@@ -3,9 +3,9 @@ import json
 import os.path
 
 try:
-    import urllib.request as urllib2
+	import urllib.request as urllib2
 except ImportError:
-    import urllib2
+	import urllib2
 
 import urllib.parse
 import re
@@ -28,6 +28,7 @@ from subprocess import Popen, PIPE, STDOUT
 # Check to see if we're in Sublime Text 3
 ST3 				= int(sublime.version()) >= 3000
 master_password 	= None
+openssl_enabled		= True
 
 #
 # Pages / Templates Quick Panel Load
@@ -35,27 +36,31 @@ master_password 	= None
 
 class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 	def run( self, type = 'pages' ):
+		global openssl_enabled
+
 		self.type 		= type
 		self.settings 	= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
 
-		if not self.settings.has( 'password_verification' ):
+		self.load_sites()
+
+		if self.settings.has( 'disable_master_password' ):
+			openssl_enabled	= not self.settings.get( 'disable_master_password' )
+
+		if openssl_enabled and not self.settings.has( 'password_verification' ):
 			sublime.error_message( 'Master password not set. Close this dialog and enter a master password' )
 			return self.set_master_password()
 
-		self.load_sites()
-
 	def load_sites( self ):
-		global master_password
-		#self.settings.set( 'Test', 'MyValue' )
-		#sublime.save_settings( 'MvSublimeTemplateEditor.sublime-settings' )
-		self.sites		= []
+		global master_password, openssl_enabled
+
+		self.sites = []
 
 		for site in self.settings.get( 'sites', [] ):
 			self.sites.append( site[ 'name' ] )
 
 		self.sites.append( 'Add Store' )
 
-		if master_password == None:
+		if openssl_enabled and master_password == None:
 			return self.prompt_master_pass()
 
 		self.show_sites()
@@ -64,7 +69,7 @@ class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 		sublime.set_timeout( lambda: self.window.show_quick_panel( self.sites, lambda index: self.site_callback( self.sites, index ) ) )
 
 	def prompt_master_pass( self ):
-		self.show_input_panel( 'Enter Master Password', '', lambda password: self.prompt_master_pass_callback( password ), None, None )
+		PasswordInputPanel( 'Enter Master Password', self.prompt_master_pass_callback )
 
 	def prompt_master_pass_callback( self, password ):
 		global master_password
@@ -117,7 +122,7 @@ class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 			self.window.run_command( 'mv_sublime_template_editor_get_templates', { 'settings': settings } )
 
 	def set_master_password( self ):
-		self.show_input_panel( 'Set Master Password', '', lambda password: self.set_master_password_callback( password ), None, None )
+		PasswordInputPanel( 'Set Master Password', self.set_master_password_callback )
 
 	def set_master_password_callback( self, master_pass ):
 		global master_password
@@ -128,10 +133,19 @@ class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 
 		master_password = master_pass
 		self.settings.set( 'password_verification', data.decode(encoding='UTF-8') )
-		self.settings.set( 'sites', [] )
+		sites 		= self.settings.get( 'sites' )
+
+		for site in sites:
+			success, encrypted_password, error_message = crypto( master_password, site[ 'store' ][ 'password' ], '-e' )
+
+			if success:
+				site[ 'store' ][ 'password_encrypted' ] 	= True
+				site[ 'store' ][ 'password' ] 				= encrypted_password.decode( encoding='UTF-8' )
+
+		self.settings.set( 'sites', sites )
 		sublime.save_settings( 'MvSublimeTemplateEditor.sublime-settings' )
 
-		self.add_store()
+		self.show_sites()
 
 	def add_store( self ):
 		site 			= {}
@@ -175,13 +189,18 @@ class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 		self.show_input_panel( 'Enter Password', '', lambda entered_text: self.add_store_password_callback( site, entered_text ), None, None )
 
 	def add_store_password_callback( self, site, password ):
-		global master_password
-		success, data, error_message = crypto( master_password, password, '-e' )
+		global master_password, openssl_enabled
 
-		if not success:
-			return sublime.error_message( error_message )
+		if openssl_enabled:
+			success, data, error_message = crypto( master_password, password, '-e' )
 
-		site[ 'store' ][ 'password' ] 	= data.decode( encoding='UTF-8' )
+			if not success:
+				return sublime.error_message( error_message )
+
+			password = data.decode( encoding='UTF-8' )
+			site[ 'store' ][ 'password_encrypted' ] = True
+
+		site[ 'store' ][ 'password' ] 	= password
 		site[ 'store' ][ 'timeout' ]	= 15
 
 		sites = self.settings.get( 'sites' )
@@ -617,6 +636,37 @@ class Template_Update_ID( threading.Thread ):
 
 		print( 'Page imported' )
 
+class PasswordInputPanel():
+	def __init__( self, prompt, on_complete ):
+		self.window 		= sublime.active_window()
+		self.prompt 		= prompt
+		self.on_complete	= on_complete
+		self.password 		= ''
+		self.stars 			= ''
+		self.window.show_input_panel( self.prompt, '', self.on_input, self.getpwd, None )
+ 
+	def getpwd( self, password ):
+		chg = password[len(self.stars):]
+
+		if  len( password ) < len( self.password ):
+			new_password = self.password[:len( password )]
+		else:
+			new_password = self.password + chg
+
+		if self.password == new_password:
+			return
+
+		self.password 	= new_password
+		self.stars 		= "*" * len( password )	
+		sublime.set_timeout( lambda: self.window.show_input_panel( self.prompt, self.stars, self.on_input, self.getpwd, None ), 10 )
+ 
+	def on_input( self, password ):
+		if self.password.strip() == "":
+			self.panel( "No password provided" )
+			return
+
+		sublime.set_timeout( lambda: self.on_complete( self.password.strip() ), 10 )
+
 #
 # Helper Functions
 #
@@ -689,7 +739,7 @@ def join_path( dir_path, file_path, server_type ):
 	return os.path.join( dir_path, file_path )
 
 def make_json_request( store_settings, function, other_data = '' ):
-		global master_password
+		global master_password, openssl_enabled
 
 		store_settings.setdefault( 'store_code', '' )
 		store_settings.setdefault( 'json_url', '' )
@@ -703,10 +753,24 @@ def make_json_request( store_settings, function, other_data = '' ):
 		password	= store_settings[ 'password' ]
 		timeout		= store_settings[ 'timeout' ]
 
-		success, decoded_password, error_message = crypto( master_password, password, '-d' )
+		if openssl_enabled:
+			if not 'password_encrypted' in store_settings:
+				settings 	= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+				sites 		= settings.get( 'sites' )
 
-		if success:
-			password = decoded_password.decode( encoding='UTF-8')
+				success, encrypted_password, error_message = crypto( master_password, password, '-e' )
+
+				if success:
+					sites[ store_code ][ 'store' ][ 'password_encrypted' ] 	= True
+					sites[ store_code ][ 'store' ][ 'password' ] 			= encrypted_password.decode( encoding='UTF-8')
+
+					self.settings.set( 'sites', sites )
+					sublime.save_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+			else:
+				success, decrypted_password, error_message = crypto( master_password, password, '-d' )
+
+				if success:
+					password = decrypted_password.decode( encoding='UTF-8')
 
 		if not json_url.endswith( '?' ):
 			json_url += '?'
