@@ -1,6 +1,5 @@
 [
-	{ "keys": [ "ctrl+m", "ctrl+p" ], "command": "mv_sublime_template_editor_get_pages" },
-	{ "keys": [ "ctrl+m", "ctrl+a" ], "command": "mv_sublime_template_editor_get_templates" },
-	{ "keys": [ "ctrl+m", "ctrl+m" ], "command": "mv_sublime_template_editor_template_menu" },
-	{ "keys": [ "ctrl+m", "ctrl+s" ], "command": "mv_sublime_template_editor_get_sites" }
+	{ "keys": [ "ctrl+m", "ctrl+p" ], "command": "mv_sublime_template_editor_get_sites", "args": { "type": "pages" } },
+	{ "keys": [ "ctrl+m", "ctrl+a" ], "command": "mv_sublime_template_editor_get_sites", "args": { "type": "templates" } },
+	{ "keys": [ "ctrl+m", "ctrl+m" ], "command": "mv_sublime_template_editor_template_menu" }
 ]

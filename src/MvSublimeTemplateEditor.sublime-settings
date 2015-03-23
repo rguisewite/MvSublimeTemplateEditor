@@ -1,16 +1,30 @@
 {
-	// Disable Master Password (store passwords will be saved in plain text)
-	// "disable_master_password": true,
+	/* 
 
-	// OpenSSL commands (use when Master Password is enabled). Cipher type should be "-des3" or "-aes256"
+		Store Password Encryption via OpenSSL.
+
+		To disable (store passwords will be saved in this settings file as plain text), use:
+		"disable_master_password": true
+
+		If enabled (aka, if the above command is absent), use the following options:
+		"openssl_command"	: The path to your openssl executable. e.g. "/usr/bin/openssl" or "C:\\bin\\openssl.exe"
+		"cipher"			: Should be "-des3" or "-aes256"
+		
+	*/
+
 	"openssl_command": "openssl",
   	"cipher": "-aes256",
 
-  	// Array of stores
+  	/*
+
+  		Store List
+
+  	*/
+
 	"sites":
 	[
 		{
-			"name": "Domain.com",
+			"name": "unique name for this entry (displayed in context menu)",
 			"store":
 			{
 				// the store code to grab the pages from
