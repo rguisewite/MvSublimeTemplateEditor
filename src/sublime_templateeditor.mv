@@ -270,6 +270,11 @@
 		</MvCAPTURE>
 	</MvFOREACH>
 
+	<MvASSIGN NAME = "l.page_templates" 											VALUE = "{ g.Session:cache:sublime_templateeditor:page:templates }">
+	<MvASSIGN NAME = "l.page_template_count" 										VALUE = "{ g.Session:cache:sublime_templateeditor:page:template_count }">
+	<MvASSIGN NAME = "g.Session:cache:sublime_templateeditor:page:templates" 		VALUE = "">
+	<MvASSIGN NAME = "g.Session:cache:sublime_templateeditor:page:template_count" 	VALUE = 0>
+
 	<MvCAPTURE VARIABLE = "l.discard">
 		<MvFOREACH ITERATOR = "l.vis_module" ARRAY = "l.raw_vis_modules" COUNT = "{ [ g.Module_Library_DB ].StoreModuleList_Load_Features( 'vis_store', l.raw_vis_modules ) }">
 			<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].Module_Load_Features( l.vis_module ) }">
@@ -290,6 +295,11 @@
 		</MvFOREACH>
 	</MvCAPTURE>
 
+	<MvASSIGN NAME = "l.global_templates" 											VALUE = "{ g.Session:cache:sublime_templateeditor:page:templates }">
+	<MvASSIGN NAME = "l.global_template_count" 										VALUE = "{ g.Session:cache:sublime_templateeditor:page:template_count }">
+	<MvASSIGN NAME = "g.Session:cache:sublime_templateeditor:page:templates" 		VALUE = "">
+	<MvASSIGN NAME = "g.Session:cache:sublime_templateeditor:page:template_count" 	VALUE = 0>
+
 	<MvASSIGN NAME = "g.Module_Feature_TUI_DB" 				VALUE = "{ l.original_module_feature_tui_db }">
 	<MvASSIGN NAME = "g.Feature_TUI_DB" 					VALUE = "{ l.original_feature_tui_db }">
 	<MvASSIGN NAME = "g.Feature_Filename_TUI_DB" 			VALUE = "{ l.original_feature_filename_tui_db }">
@@ -307,7 +317,7 @@
 				"filename":		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ '-page.htm' ) }">"
 			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
 
-			<MvFOREACH ITERATOR = "l.template_id" ARRAY = "g.Session:cache:sublime_templateeditor:page:templates" COUNT = "{ g.Session:cache:sublime_templateeditor:page:template_count }">
+			<MvFOREACH ITERATOR = "l.template_id" ARRAY = "l.page_templates" COUNT = "{ l.page_template_count }">
 				<MvIF EXPR = "{ NOT [ g.Module_Feature_TUI_DB ].ManagedTemplate_Load_ID( l.template_id, l.managedtemplate ) }">
 					<MvFOREACHCONTINUE>
 				</MvIF>
@@ -316,7 +326,20 @@
 					"id": 			<MvEVAL EXPR = "{ int( l.template_id ) }">,
 					"current_id": 	<MvEVAL EXPR = "{ int( l.managedtemplate:current_id ) }">,
 					"display": 		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ ': ' $ l.managedtemplate:filename ) }">",
-				"filename":		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ '-' $ substring_var( l.managedtemplate:filename, 1, len_var( l.managedtemplate:filename ) - 4 ) $ '-item.htm' ) }">"
+					"filename":		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ '-' $ substring_var( l.managedtemplate:filename, 1, len_var( l.managedtemplate:filename ) - 4 ) $ '-item.htm' ) }">"
+				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
+			</MvFOREACH>
+
+			<MvFOREACH ITERATOR = "l.template_id" ARRAY = "l.global_templates" COUNT = "{ l.global_template_count }">
+				<MvIF EXPR = "{ NOT [ g.Module_Feature_TUI_DB ].ManagedTemplate_Load_ID( l.template_id, l.managedtemplate ) }">
+					<MvFOREACHCONTINUE>
+				</MvIF>
+
+				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.page_count ) }">
+					"id": 			<MvEVAL EXPR = "{ int( l.template_id ) }">,
+					"current_id": 	<MvEVAL EXPR = "{ int( l.managedtemplate:current_id ) }">,
+					"display": 		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( 'Global Template: ' $ l.managedtemplate:filename ) }">",
+					"filename":		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( 'global_template-' $ substring_var( l.managedtemplate:filename, 1, len_var( l.managedtemplate:filename ) - 4 ) $ '-item.htm' ) }">"
 				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
 			</MvFOREACH>
 		]
