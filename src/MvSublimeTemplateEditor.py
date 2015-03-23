@@ -90,7 +90,7 @@ class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 		master_password = password
 		self.show_sites()
 
-	def site_callback( self, sites, index):
+	def site_callback( self, sites, index ):
 		if index == -1:
 			return
 
@@ -295,20 +295,16 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 		self.goto_file( templates[ index ], self.file_args )
 
 	def initiate_template_download( self, templates, template, index ):
-		filename 	= template[ 'filename' ]
-		current_id	= template[ 'current_id' ]
-		thread 		= Template_Load_ID( current_id, filename, self.settings, lambda record: self.download_template( templates, template, record, index ) )
+		parameters = '&Module_Code=sublime_templateeditor&Module_Function=Template_Load_ID&ManagedTemplateVersion_ID={0}&TemporarySession=1' . format( template[ 'current_id' ] )
+		json_threadpool.add_request( self.settings, parameters, lambda record: self.download_template( template, record, index ) )
+
+	def download_template( self, template, record, index ):
+		record[ 'template_name' ]	= template[ 'filename' ]
+		template[ 'record' ] 		= record
+		thread						= Template_Write_File( template, self.settings.get( 'local_exported_templates', '' ), lambda ignore: self.download_template_callback( template, index ) )
 		thread.start()
-		ThreadProgress( thread, 'Downloading template {0}' . format( filename ), '{0} downloaded' . format( filename ), 'Template download of {0} failed' . format( filename ) )
 
-	def download_template( self, templates, template, record, index ):
-		template[ 'record' ] 	= record
-		local_directory			= self.settings.get( 'local_exported_templates', '' )
-		file_name 				= '{0}' . format ( template[ 'record' ][ 'template_name' ] )
-		local_file_path			= os.path.join( local_directory, file_name )
-		with open( local_file_path, 'w' ) as fh:
-				fh.write( template[ 'record' ][ 'source' ] )
-
+	def download_template_callback( self, template, index ):
 		if index == self.selected_index:
 			self.goto_file( template, self.file_args )
 
@@ -619,11 +615,25 @@ class Template_Load_ID( threading.Thread ):
 
 		template = response[ 'data' ]
 		template[ 'template_name' ] = self.template_name
-		print( "{0}" . format( template[ 'id' ] ) )
-
-		print( 'Page exported' )
 
 		sublime.set_timeout( lambda: self.on_complete( template ), 10 )
+
+class Template_Write_File( threading.Thread ):
+	def __init__( self, template, local_directory, on_complete ):
+		self.template 			= template
+		self.local_directory	= local_directory
+		self.on_complete		= on_complete
+
+		threading.Thread.__init__( self )
+
+	def run( self ):
+		file_name 				= '{0}' . format ( self.template[ 'record' ][ 'template_name' ] )
+		local_file_path			= os.path.join( self.local_directory, file_name )
+
+		with open( local_file_path, 'w' ) as fh:
+				fh.write( self.template[ 'record' ][ 'source' ] )
+
+		sublime.set_timeout( lambda: self.on_complete( self.template ), 10 )
 
 class Template_Update_ID( threading.Thread ):
 	def __init__( self, managedtemplate_id, source, settings, on_complete ):
@@ -676,6 +686,68 @@ class PasswordInputPanel():
 			return
 
 		sublime.set_timeout( lambda: self.on_complete( self.password.strip() ), 10 )
+
+class JSON_Threadpool_Thread( threading.Thread ):
+	def __init__( self, settings, parameters, on_complete ):
+		self.settings			= settings
+		self.parameters 		= parameters
+		self.on_complete		= on_complete
+		self.error				= False
+
+		threading.Thread.__init__( self )
+
+	def run( self ):
+		store_settings 				= self.settings.get( 'store' )
+		result, response, error		= make_json_request( store_settings, 'Module', self.parameters )
+
+		if not result:
+			self.error = True
+			return sublime.error_message( error )
+
+		data = response[ 'data' ]
+
+		sublime.set_timeout( lambda: self.on_complete( data ), 10 )
+
+class JSON_Threadpool():
+	def __init__( self, thread_count = 3 ):
+		self.thread_count 		= 3
+		self.active_count		= 0
+		self.running			= False
+		self.queue				= []
+		self.running_queue		= []
+ 
+	def add_request( self, settings, parameters, on_complete = None ):
+		request = JSON_Threadpool_Thread( settings, parameters, lambda data: self.run_request_callback( data, on_complete ) )
+		self.queue.append( request )
+		self.run()
+ 
+	def run( self ):
+		if self.running or len( self.queue ) == 0:
+			return
+
+		self.running = True
+
+		for i in range( 0, self.thread_count ):
+			if len( self.queue ) > i:
+				request = self.queue.pop( 0 )
+				self.run_request( request )
+
+	def run_request( self, request ):
+		print( 'Running Request' )
+		request.start()
+
+	def run_request_callback( self, data, on_complete = None ):
+		if on_complete != None:
+			sublime.set_timeout( lambda: on_complete( data ), 10 )
+
+		if len( self.queue ) == 0:
+			self.running = False
+			return
+
+		request = self.queue.pop( 0 )
+		self.run_request( request )
+
+json_threadpool = JSON_Threadpool()
 
 #
 # Helper Functions
@@ -792,7 +864,6 @@ def make_json_request( store_settings, function, other_data = '' ):
 
 		try:
 			req = urllib2.Request( url, other_data.encode( 'utf8' ) )
-			#request = urllib.request.urlopen( url, timeout = timeout )
 			request = urllib2.urlopen( req, timeout = timeout )
 		except Exception as e:
 			print( 'Failed opening URL: {0}' . format( str( e ) ) )

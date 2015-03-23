@@ -247,8 +247,8 @@
 		</MvREFERENCEARRAY>
 
 		<MvCAPTURE VARIABLE = "l.discard">
-			<MvDO FILE = "{ g.Module_Root $ l.item:module }" NAME = "l.component_tabs" VALUE = "{ ComponentModule_Tabs( l.items, l.item:item_code, l.settings ) }">
-			<MvIF EXPR = "{ len( l.component_tabs ) }">
+			<MvASSIGN NAME = "l.component_tabs" VALUE = "{ [ g.Module_Root $ l.item:module ].ComponentModule_Tabs( l.items, l.item:item_code, l.settings ) }">
+			<MvIF EXPR = "{ NOT ISNULL l.component_tabs }">
 				<MvFOREACH ITERATOR = "l.tab" ARRAY = "l.tabs" COUNT = "{ [ g.Module_Library_Utilities ].SplitStringAndTrim( l.component_tabs, ',', l.tabs ) }">
 					<MvASSIGN NAME = "g.Tab" 				VALUE = "{ l.tab }">
 
@@ -260,7 +260,7 @@
 					</MvREFERENCEARRAY>
 
 					<MvASSIGN NAME = "l.load_fields"		VALUE = "{ miva_array_search( g.Page_Items_Initialized, 1, l.initialized_item_code, 'l.initialized_item_code EQ l.item:item_code' ) EQ 0 }">
-					<MvASSIGN NAME = "l.ignore"				VALUE = "{ [ g.Module_Root $ l.item:module ].ComponentModule_Content( l.item, l.item:item_code, g.Tab, l.load_fields, l.field_prefix, l.empty, l.settings ) }">
+					<MvASSIGN NAME = "l.ignore"				VALUE = "{ [ g.Module_Root $ l.item:module ].ComponentModule_Content( l.item, l.item:item_code, g.Tab, 1, l.field_prefix, l.empty, l.settings ) }">
 
 					<MvIF EXPR = "{ l.load_fields }">
 						<MvASSIGN NAME = "l.null"			VALUE = "{ miva_array_insert( g.Page_Items_Initialized, l.item:item_code, -1 ) }">
@@ -269,6 +269,26 @@
 			</MvIF>
 		</MvCAPTURE>
 	</MvFOREACH>
+
+	<MvCAPTURE VARIABLE = "l.discard">
+		<MvFOREACH ITERATOR = "l.vis_module" ARRAY = "l.raw_vis_modules" COUNT = "{ [ g.Module_Library_DB ].StoreModuleList_Load_Features( 'vis_store', l.raw_vis_modules ) }">
+			<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].Module_Load_Features( l.vis_module ) }">
+				<MvFOREACHCONTINUE>
+			</MvIF>
+
+			<MvIF EXPR = "{ l.vis_module:feature_hash:component OR
+							l.vis_module:feature_hash:storeui }">
+				<MvASSIGN NAME = "l.module_tabs"			VALUE = "{ [ g.Module_Root $ l.vis_module:module ].Module_Store_Tabs( l.vis_module ) }">
+
+				<MvIF EXPR = "{ NOT ISNULL l.module_tabs }">
+					<MvFOREACH ITERATOR = "l.tab" ARRAY = "l.tabs" COUNT = "{ [ g.Module_Library_Utilities ].SplitStringAndTrim( l.module_tabs, ',', l.tabs ) }">
+						<MvASSIGN NAME = "g.Tab" 			VALUE = "{ l.tab }">
+						<MvASSIGN NAME = "l.ignore" 		VALUE = "{ [ g.Module_Root $ l.vis_module:module ].Module_Store_Content( l.vis_module, g.Tab, 1 ) }">
+					</MvFOREACH>
+				</MvIF>
+			</MvIF>
+		</MvFOREACH>
+	</MvCAPTURE>
 
 	<MvASSIGN NAME = "g.Module_Feature_TUI_DB" 				VALUE = "{ l.original_module_feature_tui_db }">
 	<MvASSIGN NAME = "g.Feature_TUI_DB" 					VALUE = "{ l.original_feature_tui_db }">
