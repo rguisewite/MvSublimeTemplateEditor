@@ -246,12 +246,13 @@ class MvSublimeTemplateEditorGetPagesCommand( sublime_plugin.WindowCommand ):
 
 class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 	def run( self, settings = None, page_code = None ):
-		self.settings 		= settings
-		self.page_code 		= page_code
-		self.current_view 	= self.window.active_view()
-		self.selected_index	= 0
+		self.settings 					= settings
+		self.page_code 					= page_code
+		self.current_view 				= self.window.active_view()
+		self.selected_index				= 0
 		self.template_load_initiated	= False
-		settings 			= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+		settings 						= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+		self.file_args					= sublime.TRANSIENT
 
 		if self.page_code is None:
 			return
@@ -281,14 +282,17 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 				self.window.focus_view( self.current_view )
 			return
 
-		self.goto_file( templates[ index ] )
+		self.file_args 			= 0
+		self.selected_index 	= index
+		
+		self.goto_file( templates[ index ], self.file_args )
 
 	def on_highlight( self, templates, index ):
 		if index == -1:
 			return
 
 		self.selected_index = index
-		self.goto_file( templates[ index ], sublime.TRANSIENT )
+		self.goto_file( templates[ index ], self.file_args )
 
 	def initiate_template_download( self, templates, template, index ):
 		filename 	= template[ 'filename' ]
@@ -306,11 +310,17 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 				fh.write( template[ 'record' ][ 'source' ] )
 
 		if index == self.selected_index:
-			self.goto_file( template, sublime.TRANSIENT )
+			self.goto_file( template, self.file_args )
 
 	def goto_file( self, template, file_args = 0 ):
 		local_directory		= self.settings.get( 'local_exported_templates', '' )
-		file_name 			= '{0}' . format( template[ 'record' ][ 'template_name' ] )
+
+		try:
+			file_name 		= '{0}' . format( template[ 'record' ][ 'template_name' ] )
+
+		except KeyError:
+			return			# File hasn't loaded yet. Don't do anything.
+
 		local_file_path		= os.path.join( local_directory, file_name )
 		view 				= self.window.open_file( local_file_path, file_args )
 		view_settings 		= view.settings()
