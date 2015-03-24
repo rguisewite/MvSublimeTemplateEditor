@@ -325,7 +325,7 @@
 				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.page_count ) }">
 					"id": 			<MvEVAL EXPR = "{ int( l.template_id ) }">,
 					"current_id": 	<MvEVAL EXPR = "{ int( l.managedtemplate:current_id ) }">,
-					"display": 		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ ': ' $ l.managedtemplate:filename ) }">",
+					"display": 		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ ': ' $ substring_var( l.managedtemplate:filename, 1, len_var( l.managedtemplate:filename ) - 4 ) $ '-item.htm' ) }">",
 					"filename":		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( l.page:code $ '-' $ substring_var( l.managedtemplate:filename, 1, len_var( l.managedtemplate:filename ) - 4 ) $ '-item.htm' ) }">"
 				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
 			</MvFOREACH>
@@ -338,7 +338,7 @@
 				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.page_count ) }">
 					"id": 			<MvEVAL EXPR = "{ int( l.template_id ) }">,
 					"current_id": 	<MvEVAL EXPR = "{ int( l.managedtemplate:current_id ) }">,
-					"display": 		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( 'Global Template: ' $ l.managedtemplate:filename ) }">",
+					"display": 		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( 'Global Template: ' $ substring_var( l.managedtemplate:filename, 1, len_var( l.managedtemplate:filename ) - 4 ) $ '-item.htm' ) }">",
 					"filename":		"<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Encode( 'global_template-' $ substring_var( l.managedtemplate:filename, 1, len_var( l.managedtemplate:filename ) - 4 ) $ '-item.htm' ) }">"
 				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
 			</MvFOREACH>
