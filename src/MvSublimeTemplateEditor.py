@@ -12,18 +12,8 @@ import re
 import threading
 
 import os, random, string
+import subprocess
 from subprocess import Popen, PIPE, STDOUT
-
-#
-#from PBKDF2 import PBKDF2
-#from Crypto.Cipher import AES
-#import os
-#
-#salt = os.urandom(8)    # 64-bit salt
-#key = PBKDF2("P@ssw0rd.", salt).read(32) # 256-bit key
-#iv = os.urandom(16)     # 128-bit IV
-#cipher = AES.new(key, AES.MODE_CBC, iv)
-#
 
 # Check to see if we're in Sublime Text 3
 ST3 				= int(sublime.version()) >= 3000
@@ -759,22 +749,29 @@ json_threadpool = JSON_Threadpool()
 #   echo "data" | openssl enc -e -aes128 -base64 -pass "pass:lolcats"
 #
 def crypto( password, data, enc_flag = '-e' ):
-	settings 				= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
-	cipher 					= settings.get('cipher')
-	openssl_command 		= os.path.normpath( settings.get('openssl_command') )
+	settings 						= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+	cipher 							= settings.get('cipher')
+	openssl_command 				= os.path.normpath( settings.get('openssl_command') )
 
 	# pass the password as an ENV variable, for better security
-	envVar 					= ''.join( random.sample( string.ascii_uppercase, 23 ) )
-	os.environ[ envVar ] 	= password
-	_pass 					= "env:%s" % envVar
+	envVar 							= ''.join( random.sample( string.ascii_uppercase, 23 ) )
+	os.environ[ envVar ] 			= password
+	_pass 							= "env:%s" % envVar
 
 	try:
 		if isinstance(data, str):
-			data_handled	= data.encode( 'utf-8' )
+			data_handled			= data.encode( 'utf-8' )
 		else:
-			data_handled	= data
-		openssl 			= Popen( [openssl_command, "enc", enc_flag, cipher, "-base64", "-pass", _pass], stdin=PIPE, stdout=PIPE, stderr=PIPE )
-		result, error 		= openssl.communicate( data_handled )
+			data_handled			= data
+
+		startupinfo 				= None
+		if sublime.platform() == 'windows':
+			startupinfo 			= subprocess.STARTUPINFO()
+			startupinfo.dwFlags 	|= subprocess.STARTF_USESHOWWINDOW
+
+		openssl 					= Popen( [openssl_command, "enc", enc_flag, cipher, "-base64", "-pass", _pass], startupinfo=startupinfo, stdin=PIPE, stdout=PIPE, stderr=PIPE )
+
+		result, error 				= openssl.communicate( data_handled )
 
 		del os.environ[envVar] # get rid of the temporary ENV var
 	except IOError as e:
@@ -828,6 +825,7 @@ def make_json_request( store_settings, function, other_data = '' ):
 		store_settings.setdefault( 'username', '' )
 		store_settings.setdefault( 'password', '' )
 		store_settings.setdefault( 'timeout', 15 )
+		store_settings.setdefault( 'password_decrypted', '' )
 
 		store_code	= store_settings[ 'store_code' ]
 		json_url 	= store_settings[ 'json_url' ]
@@ -848,11 +846,14 @@ def make_json_request( store_settings, function, other_data = '' ):
 
 					self.settings.set( 'sites', sites )
 					sublime.save_settings( 'MvSublimeTemplateEditor.sublime-settings' )
+			elif store_settings[ 'password_decrypted' ] != '':
+				password = store_settings[ 'password_decrypted' ]
 			else:
 				success, decrypted_password, error_message = crypto( master_password, password, '-d' )
 
 				if success:
 					password = decrypted_password.decode( encoding='UTF-8')
+					store_settings[ 'password_decrypted' ] = password
 
 		if not json_url.endswith( '?' ):
 			json_url += '?'
