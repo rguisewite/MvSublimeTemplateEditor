@@ -41,10 +41,10 @@ class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 		self.type 		= type
 		self.settings 	= sublime.load_settings( 'MvSublimeTemplateEditor.sublime-settings' )
 
-		self.load_sites()
-
 		if self.settings.has( 'disable_master_password' ):
 			openssl_enabled	= not self.settings.get( 'disable_master_password' )
+
+		self.load_sites()
 
 		if openssl_enabled and not self.settings.has( 'password_verification' ):
 			sublime.error_message( 'Master password not set. Close this dialog and enter a master password' )
