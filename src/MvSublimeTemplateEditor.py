@@ -203,7 +203,6 @@ class MvSublimeTemplateEditorGetSitesCommand( sublime_plugin.WindowCommand ):
 	def show_input_panel( self, caption, initial_text, on_done, on_change = None, on_cancel = None ):
 		sublime.set_timeout( lambda: self.window.show_input_panel( caption, initial_text, on_done, on_change, on_cancel ), 10 )
 
-
 class MvSublimeTemplateEditorGetPagesCommand( sublime_plugin.WindowCommand ):
 	def run( self, settings = None ):
 		self.settings = settings
@@ -279,9 +278,103 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 
 	def on_highlight( self, templates, index ):
 		if index == -1:
+			if self.current_view:
+				self.window.focus_view( self.current_view )
 			return
 
 		self.selected_index = index
+		self.goto_file( templates[ index ], self.file_args )
+
+	def initiate_template_download( self, templates, template, index ):
+		parameters = '&Module_Code=sublime_templateeditor&Module_Function=Template_Load_ID&ManagedTemplateVersion_ID={0}&TemporarySession=1' . format( template[ 'current_id' ] )
+		json_threadpool.add_request( self.settings, parameters, lambda record: self.download_template( template, record, index ) )
+
+	def download_template( self, template, record, index ):
+		record[ 'template_name' ]	= template[ 'filename' ]
+		template[ 'record' ] 		= record
+		thread						= Template_Write_File( template, self.settings.get( 'local_exported_templates', '' ), lambda ignore: self.download_template_callback( template, index ) )
+		thread.start()
+
+	def download_template_callback( self, template, index ):
+		if index == self.selected_index:
+			self.goto_file( template, self.file_args )
+
+	def goto_file( self, template, file_args = 0 ):
+		local_directory		= self.settings.get( 'local_exported_templates', '' )
+
+		try:
+			file_name 		= '{0}' . format( template[ 'record' ][ 'template_name' ] )
+		except KeyError:
+			return			# File hasn't loaded yet. Don't do anything.
+
+		local_file_path		= os.path.join( local_directory, file_name )
+		view 				= self.window.open_file( local_file_path, file_args )
+		view_settings 		= view.settings()
+		view_settings.set( 'miva_managedtemplateversion', "true" )
+		view_settings.set( 'miva_managedtemplateversion_template', template[ 'record' ] )
+		view_settings.set( 'miva_settings', self.settings )
+		view_settings.set( 'miva_managedtemplateversion_page_code', self.page_code )
+
+	def show_quick_panel( self, entries, on_select, on_highlight = None, selected_index = 0 ):
+		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, 0, selected_index, on_highlight ), 10 )
+
+class MvSublimeTemplateEditorGetTemplatesCommand( sublime_plugin.WindowCommand ):
+	def run( self, settings = None ):
+		self.settings 			= settings
+		self.selected_index 	= 0
+		self.file_args			= sublime.TRANSIENT
+		self.current_view 		= self.window.active_view()
+
+		if self.settings is None:
+			return self.window.run_command( 'mv_sublime_template_editor_get_sites', { 'type': 'templates' } )
+
+		thread = TemplateList_Load_All_Thread( self.settings, on_complete = self.templates_quick_panel )
+		thread.start()
+		ThreadProgress( thread, 'Loading templates', error_message = 'Failed loading templates' )
+
+	def templates_quick_panel( self, templates ):
+		entries = []
+
+		for template in templates:
+			entries.extend( [ 'Template file - {0}' . format( template[ 'filename' ] ) ] )
+
+		self.show_quick_panel( entries, lambda index: self.select_entry( templates, index ), lambda index: self.on_highlight( templates, index ), self.selected_index )
+
+	def select_entry( self, templates, index ):
+		if index == -1:
+			if self.current_view:
+				self.window.focus_view( self.current_view )
+			return
+
+		self.file_args 			= 0
+		self.selected_index 	= index
+
+		try:
+			dummy 				= templates[ index ][ 'record' ][ 'template_name' ]
+		except KeyError:
+			self.initiate_template_download( templates, templates[ index ], index )
+			# File hasn't loaded yet. Don't do anything.
+
+			return
+		
+		self.goto_file( templates[ index ], self.file_args )
+
+	def on_highlight( self, templates, index ):
+		if index == -1:
+			if self.current_view:
+				self.window.focus_view( self.current_view )
+			return
+
+		self.selected_index 	= index
+
+		try:
+			dummy 				= templates[ index ][ 'record' ][ 'template_name' ]
+		except KeyError:
+			self.initiate_template_download( templates, templates[ index ], index )
+			# File hasn't loaded yet. Don't do anything.
+
+			return
+
 		self.goto_file( templates[ index ], self.file_args )
 
 	def initiate_template_download( self, templates, template, index ):
@@ -317,50 +410,6 @@ class MvSublimeTemplateEditorGetPageCommand( sublime_plugin.WindowCommand ):
 
 	def show_quick_panel( self, entries, on_select, on_highlight = None, selected_index = 0 ):
 		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, 0, selected_index, on_highlight ), 10 )
-
-class MvSublimeTemplateEditorGetTemplatesCommand( sublime_plugin.WindowCommand ):
-	def run( self, settings = None ):
-		self.settings = settings
-
-		if self.settings is None:
-			return self.window.run_command( 'mv_sublime_template_editor_get_sites', { 'type': 'templates' } )
-
-		thread = TemplateList_Load_All_Thread( self.settings, on_complete = self.templates_quick_panel )
-		thread.start()
-		ThreadProgress( thread, 'Loading templates', error_message = 'Failed loading templates' )
-
-	def templates_quick_panel( self, templates ):
-		entries = []
-
-		for template in templates:
-			entries.extend( [ 'Template file - {0}' . format( template[ 'filename' ] ) ] )
-
-		self.show_quick_panel( entries, lambda index: self.templates_callback( templates, index ) )
-
-	def templates_callback( self, templates, index ):
-		if index == -1:
-			return
-
-		filename 			= templates[ index ][ 'filename' ]
-		current_id			= templates[ index ][ 'current_id' ]
-		thread 				= Template_Load_ID( current_id, filename, self.settings, on_complete = self.download_template )
-		thread.start()
-		ThreadProgress( thread, 'Exporting {0}' . format( filename ), '{0} exported' . format( filename ), 'Export of {0} failed' . format( filename ) )
-
-	def download_template( self, template ):
-		local_directory		= self.settings.get( 'local_exported_templates', '' )
-		file_name 			= '{0}.htm' . format ( template[ 'template_name' ] )
-		local_file_path		= os.path.join( local_directory, file_name )
-		with open( local_file_path, 'w' ) as fh:
-				fh.write( template[ 'source' ] )
-		view = self.window.open_file( local_file_path )
-		view_settings = view.settings()
-		view_settings.set( 'miva_managedtemplateversion', "true" )
-		view_settings.set( 'miva_managedtemplateversion_template', template )
-		view_settings.set( 'miva_settings', self.settings )
-
-	def show_quick_panel( self, entries, on_select, on_highlight = None ):
-		sublime.set_timeout( lambda: self.window.show_quick_panel( entries, on_select, on_highlight = on_highlight ), 10 )
 
 #
 # Template Menu
