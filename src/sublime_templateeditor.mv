@@ -40,9 +40,60 @@
 	<MvELSEIF EXPR = "{ g.Module_Function EQ 'TemplateVersionList_Load_Template' }">		<MvFUNCTIONRETURN VALUE = "{ JSON_TemplateVersionList_Load_Template( l.module ) }">
 	<MvELSEIF EXPR = "{ g.Module_Function EQ 'Template_Load_ID' }">							<MvFUNCTIONRETURN VALUE = "{ JSON_Template_Load_ID( l.module ) }">
 	<MvELSEIF EXPR = "{ g.Module_Function EQ 'Template_Update_ID' }">						<MvFUNCTIONRETURN VALUE = "{ JSON_Template_Update_ID( l.module ) }">
+	<MvELSEIF EXPR = "{ g.Module_Function EQ 'StoreList_Load_All' }">						<MvFUNCTIONRETURN VALUE = "{ JSON_StoreList_Load_All( l.module ) }">
 	</MvIF>
 
 	<MvFUNCTIONRETURN VALUE = 1>
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "JSON_StoreList_Load_All" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
+	<MvIF EXPR = "{ NOT [ g.Module_JSON ].JSON_Store_Open() }">					<MvFUNCTIONRETURN>	</MvIF>
+	<MvIF EXPR = "{ NOT [ g.Module_Admin ].CanI( 'STOR', 1, 0, 0, 0 ) }">		<MvFUNCTIONRETURN>	</MvIF>
+
+	<MvASSIGN NAME = "g.Filter"		VALUE = "{ trim( g.Filter ) }">
+	<MvASSIGN NAME = "g.Sort"		VALUE = "{ trim( g.Sort ) }">
+	<MvASSIGN NAME = "g.Offset"		VALUE = "{ int( g.Offset ) }">
+	<MvASSIGN NAME = "g.Count"		VALUE = "{ int( g.Count ) }">
+	
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_SELECT( l.search_query,	'*' ) }">
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_FROM( l.search_query,	'Stores',	'' ) }">
+
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Filter( l.search_query, g.Filter,
+													 'code,license,name,owner,email,company,address,city,state,zip,phone,fax,country' ) }">
+
+	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_OrderBy_Fields( l.search_query, g.Sort,
+																 'code,license,name,owner,email,company,address,city,state,zip,phone,fax,country',
+																 'id' ) }">
+
+	<MvASSIGN NAME = "l.search_sql"	VALUE = "{ [ g.Module_Library_DB ].SQL_Query_Build( l.search_query, l.search_fields ) }">
+
+	<MvIF EXPR = "{ NOT [ g.Module_Library_DB ].SQL_Query_Count( l.search_query, l.total_count ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( g.Error_Code, g.Error_Message ) }">
+	<MvELSEIF EXPR = "{ NOT [ g.Module_Library_Native_DBAPI ].DB_OPENVIEW_Range( 'Merchant', 'Stores', l.search_sql, l.search_fields, g.Offset, g.Count ) }">
+		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_Error( 'MER-JSN-STR-00005', g.MvOPENVIEW_Error ) }">
+	</MvIF>
+	
+	<MvASSIGN NAME = "l.store_count" VALUE = 0>
+	
+	<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Response_Start() }">
+	{
+		"total_count": <MvEVAL EXPR = "{ int( l.total_count ) }">,
+		"start_offset": <MvEVAL EXPR = "{ int( g.Offset ) }">,
+		"data":
+		[
+		<MvWHILE EXPR = "{ ( NOT Stores.d.EOF ) AND ( ( g.Count EQ 0 ) OR ( l.store_count LT g.Count ) ) }">
+			<MvEVAL EXPR = "{ [ g.Module_Library_DB ].Store_Read( l.store ) }">
+
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_Start( l.store_count ) }">
+				<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_Store( l.store ) }">
+			<MvEVAL EXPR = "{ [ g.Module_JSON ].JSON_ArrayElement_End() }">
+
+			<MvSKIP NAME = "Merchant" VIEW = "Stores" ROWS = 1>
+		</MvWHILE>
+		]
+	}
+	<MvCLOSEVIEW NAME = "Merchant" VIEW = "Stores">
+	<MvFUNCTIONRETURN VALUE = "{ [ g.Module_JSON ].JSON_Response_End() }">
 </MvFUNCTION>
 
 <MvFUNCTION NAME = "JSON_TemplateList_Load_Pages" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
@@ -175,8 +226,9 @@
 	<MvASSIGN NAME = "g.Sort"					VALUE = "{ trim( g.Sort ) }">
 	<MvASSIGN NAME = "g.Offset"					VALUE = "{ int( g.Offset ) }">
 	<MvASSIGN NAME = "g.Count"					VALUE = "{ int( g.Count ) }">
-	<MvASSIGN NAME = "g.ManagedTemplate_ID"		VALUE = "{ int( g.ManagedTemplate_ID ) }">
-	
+	<MvASSIGN NAME = "g.ManagedTemplate_ID"     VALUE = "{ int( g.ManagedTemplate_ID ) }">
+	<MvASSIGN NAME = "l.search_query"			VALUE = "">
+
 	<MvEVAL EXPR = "{ [ g.Module_Library_DB ].SQL_Query_SELECT( l.search_query, 'mt.id,
 																				 mt.current_id,
 																				 mt.filename,
@@ -247,7 +299,7 @@
 		</MvREFERENCEARRAY>
 
 		<MvCAPTURE VARIABLE = "l.discard">
-			<MvASSIGN NAME = "l.component_tabs" VALUE = "{ [ g.Module_Root $ l.item:module ].ComponentModule_Tabs( l.items, l.item:item_code, l.settings ) }">
+			<MvASSIGN NAME = "l.component_tabs" VALUE = "{ [ g.Module_Root $ l.item:module ].ComponentModule_Tabs( l.item, l.item:item_code, l.settings ) }">
 			<MvIF EXPR = "{ NOT ISNULL l.component_tabs }">
 				<MvFOREACH ITERATOR = "l.tab" ARRAY = "l.tabs" COUNT = "{ [ g.Module_Library_Utilities ].SplitStringAndTrim( l.component_tabs, ',', l.tabs ) }">
 					<MvASSIGN NAME = "g.Tab" 				VALUE = "{ l.tab }">
