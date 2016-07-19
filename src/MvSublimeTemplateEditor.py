@@ -913,7 +913,7 @@ def make_json_request( store_settings, function, other_data = '' ):
 		print( url + other_data )
 
 		try:
-			req = urllib2.Request( url, other_data.encode( 'utf8' ) )
+			req = urllib2.Request( url, other_data.encode( 'utf8' ), headers={'User-Agent' : "Magic Browser"} )
 			request = urllib2.urlopen( req, timeout = timeout )
 		except Exception as e:
 			print( 'Failed opening URL: {0}' . format( str( e ) ) )
