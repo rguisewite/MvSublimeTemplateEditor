@@ -483,8 +483,8 @@ class MvSublimeTemplateEditorTemplateMenu( sublime_plugin.WindowCommand ):
 		local_directory		= self.settings.get( 'local_exported_templates', '' )
 		file_name 			= '{0}.htm' . format ( template[ 'template_name' ] )
 		local_file_path		= os.path.join( local_directory, file_name )
-		with open( local_file_path, 'w' ) as fh:
-				fh.write( template[ 'source' ] )
+		with open( local_file_path, 'wb' ) as fh:
+				fh.write( template[ 'source' ].encode( 'utf8' ) )
 		view = self.window.open_file( local_file_path )
 		view_settings = view.settings()
 		view_settings.set( 'miva_managedtemplateversion', "true" )
@@ -669,8 +669,8 @@ class Template_Write_File( threading.Thread ):
 		file_name 				= '{0}' . format ( self.template[ 'record' ][ 'template_name' ] )
 		local_file_path			= os.path.join( self.local_directory, file_name )
 
-		with open( local_file_path, 'w' ) as fh:
-				fh.write( self.template[ 'record' ][ 'source' ] )
+		with open( local_file_path, 'wb' ) as fh:
+				fh.write( self.template[ 'record' ][ 'source' ].encode( 'utf8' ) )
 
 		sublime.set_timeout( lambda: self.on_complete( self.template ), 10 )
 
